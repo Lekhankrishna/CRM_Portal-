@@ -107,6 +107,9 @@ $expiresLabel = $expiresAt ? date('d-F-Y', strtotime($expiresAt)) : null;
         <a href="<?= $bp ?>admin/lpg_settings.php" class="sidebar__item<?= $currentPage === 'lpg_settings.php' ? ' active' : '' ?>">
           <span class="sidebar__icon"><i class="bi bi-key-fill"></i></span> LPG Settings
         </a>
+        <a href="<?= $bp ?>admin/whatsapp_settings.php" class="sidebar__item<?= $currentPage === 'whatsapp_settings.php' ? ' active' : '' ?>">
+          <span class="sidebar__icon"><i class="bi bi-whatsapp"></i></span> WhatsApp Settings
+        </a>
       <?php endif; ?>
       <button type="button" id="theme-toggle-btn" class="sidebar__item">
         <span class="sidebar__icon"><i class="bi bi-moon-stars-fill" id="theme-toggle-icon"></i></span>
