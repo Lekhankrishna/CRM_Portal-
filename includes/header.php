@@ -16,14 +16,16 @@ $searchRegions = [
 // sidebar-state-item class that index.php's JS uses to intercept clicks for
 // same-page state switching (a real navigation here, not a state swap).
 $searchRegionsExtra = [
-    ['label' => 'PAN India', 'href' => 'pan_india.php'],
     ['label' => 'E Commerce', 'href' => 'ecommerce.php'],
 ];
-// LPG Search is opt-in per account (Admin > Agents > "LPG Search Access") —
+// Pan India and LPG Search are both opt-in per account (Admin > Agents) —
 // only add the menu item at all when the current user has been granted it.
-// lpg_search.php enforces the same check server-side (403) regardless, so
+// The pages/APIs enforce the same check server-side (403) regardless, so
 // this is purely about not showing a link the user can't use, not the
 // actual access control.
+if (hasPanIndiaAccess()) {
+    $searchRegionsExtra[] = ['label' => 'Pan India', 'href' => 'pan_india.php'];
+}
 if (hasLpgSearchAccess()) {
     // lpg_search.php (2026-07-21) embeds the Flask bulk-search tool
     // (Gas/lpg_web/app.py, port 9196) in an iframe instead of linking
@@ -107,6 +109,9 @@ $expiresLabel = $expiresAt ? date('d-F-Y', strtotime($expiresAt)) : null;
         </a>
         <a href="<?= $bp ?>admin/lpg_settings.php" class="sidebar__item<?= $currentPage === 'lpg_settings.php' ? ' active' : '' ?>">
           <span class="sidebar__icon"><i class="bi bi-key-fill"></i></span> LPG Settings
+        </a>
+        <a href="<?= $bp ?>admin/whatsapp_settings.php" class="sidebar__item<?= $currentPage === 'whatsapp_settings.php' ? ' active' : '' ?>">
+          <span class="sidebar__icon"><i class="bi bi-whatsapp"></i></span> WhatsApp Settings
         </a>
       <?php endif; ?>
       <button type="button" id="theme-toggle-btn" class="sidebar__item">
