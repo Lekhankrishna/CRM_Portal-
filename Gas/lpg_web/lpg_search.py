@@ -11,9 +11,11 @@ import time
 # =========================================================
 # LOGIN DETAILS
 # =========================================================
+# Real values live in config.py (gitignored, see config.py.example) - found
+# hardcoded here and already committed to git history 2026-08-07; moved out
+# rather than left in place going forward.
 
-USERNAME = "NOIDCC1"
-PASSWORD = "Test@2026"
+from config import USERNAME, PASSWORD
 
 # Re-used by both _prepare_phone_search (first location) and
 # _search_one_number (every subsequent search) - see the comment in
