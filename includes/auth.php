@@ -7,20 +7,26 @@ function isLoggedIn(): bool {
     return isset($_SESSION['user_id']);
 }
 
-// A user is only ever "signed in" on the device that holds the current
-// session_token — logging in elsewhere overwrites the DB token, which
-// invalidates every older session on its next request. Checked once per
-// request (static cache) since it costs a DB round trip.
+// Each login gets its own row in user_sessions (see login.php) rather than
+// one shared token column - an account can be signed in on as many systems
+// as its max_concurrent_sessions allows. This session is only valid while
+// its specific token still has a row; login.php deletes the OLDEST row(s)
+// once a fresh login pushes the account's session count past that limit,
+// which is what actually signs an over-the-limit device out. Checked once
+// per request (static cache) since it costs a DB round trip.
 function isSessionValid(): bool {
     global $pdo;
     if (!isLoggedIn()) return true;
     static $valid = null;
     if ($valid !== null) return $valid;
-    $stmt = $pdo->prepare('SELECT session_token FROM users WHERE id = :id');
-    $stmt->execute(['id' => $_SESSION['user_id']]);
-    $dbToken = $stmt->fetchColumn();
-    $valid = ($dbToken !== false && $dbToken !== null
-        && hash_equals((string) $dbToken, (string) ($_SESSION['session_token'] ?? '')));
+    $token = (string) ($_SESSION['session_token'] ?? '');
+    if ($token === '') {
+        $valid = false;
+        return $valid;
+    }
+    $stmt = $pdo->prepare('SELECT 1 FROM user_sessions WHERE user_id = :id AND session_token = :token LIMIT 1');
+    $stmt->execute(['id' => $_SESSION['user_id'], 'token' => $token]);
+    $valid = (bool) $stmt->fetchColumn();
     return $valid;
 }
 

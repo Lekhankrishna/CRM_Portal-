@@ -84,16 +84,24 @@ try {
     }
 
     Write-Host 'Telegram connected.'
-    Write-Host 'CRM: http://127.0.0.1:8080/'
+    Write-Host 'CRM (local):  http://127.0.0.1:9196/'
+    Write-Host 'CRM (public): http://datasearch.in:9196/crm-app/  (router-forwarded to this machine, 2026-08-07)'
     Write-Host 'Press Ctrl+C to stop everything.'
     Write-Host ''
+    # 0.0.0.0 (not 127.0.0.1) so the router-forwarded public URL can reach
+    # this - PHP's built-in server isn't hardened for public traffic and
+    # this is plain HTTP with no TLS, both accepted trade-offs for now
+    # (2026-08-07) given the alternative (IIS as a reverse proxy) needs
+    # admin access this environment doesn't have.
+    #
     # Router script (not just -t $projectRoot) - without it, PHP's built-in
     # server serves EVERY file under the project root as a raw static
     # file/script with no access control, including config/*.php and
     # anything under .runtime/ - confirmed 2026-07-29 by directly fetching
-    # real credentials over http://127.0.0.1:8080/. See router.php's own
-    # comment for the full explanation.
-    & $php -S 127.0.0.1:8080 -t $projectRoot $routerScript
+    # real credentials over http://127.0.0.1:8080/. It also now strips a
+    # /crm-app/ prefix, since that's what the public URL is routed under.
+    # See router.php's own comment for the full explanation of both.
+    & $php -S 0.0.0.0:9196 -t $projectRoot $routerScript
 } finally {
     if ($workerProcess -and -not $workerProcess.HasExited) {
         Stop-Process -Id $workerProcess.Id -Force -ErrorAction SilentlyContinue
