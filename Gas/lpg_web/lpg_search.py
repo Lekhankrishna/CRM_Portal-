@@ -11,9 +11,11 @@ import time
 # =========================================================
 # LOGIN DETAILS
 # =========================================================
+# Real values live in config.py (gitignored, see config.py.example) - found
+# hardcoded here and already committed to git history 2026-08-07; moved out
+# rather than left in place going forward.
 
-USERNAME = "NOIDCC1"
-PASSWORD = "Test@2026"
+from config import USERNAME, PASSWORD
 
 # Re-used by both _prepare_phone_search (first location) and
 # _search_one_number (every subsequent search) - see the comment in
@@ -139,7 +141,11 @@ def _open_contacts(driver, wait):
             print(f"[field-debug] _open_contacts: attempt {i + 1} failed: {e}", flush=True)
             time.sleep(2)
 
-    time.sleep(3)
+    # Trimmed from 3s (found 2026-07-28, as part of speeding up bulk search -
+    # this was flat padding with no documented reason for the specific
+    # duration, unlike the adaptive wait.until() calls elsewhere in this
+    # file). Revert toward 3s if this proves too tight in practice.
+    time.sleep(1.5)
 
 
 def _prepare_phone_search(driver, wait):
@@ -159,7 +165,10 @@ def _prepare_phone_search(driver, wait):
         "All Contacts Across Organizations"
     )
 
-    time.sleep(2)
+    # Trimmed from 2s (found 2026-07-28, speeding up bulk search - flat
+    # padding with no documented specific reason; the wait.until() calls
+    # immediately after already wait adaptively for the actual next element).
+    time.sleep(1)
 
     print("[field-debug] _prepare_phone_search: waiting for phone_search_box", flush=True)
 
@@ -175,7 +184,8 @@ def _prepare_phone_search(driver, wait):
     driver.execute_script("arguments[0].focus();", phone_search_box)
     driver.execute_script("arguments[0].value='Phone';", phone_search_box)
 
-    time.sleep(2)
+    # Trimmed from 2s (found 2026-07-28) - same reasoning as above.
+    time.sleep(1)
 
     print("[field-debug] _prepare_phone_search: waiting for mobile_input", flush=True)
 
@@ -306,7 +316,8 @@ def _search_one_number(driver, wait, mobile_input, mobile_number):
     mobile_input.send_keys(mobile_number)
     mobile_input.send_keys(Keys.ENTER)
 
-    time.sleep(1)
+    # Trimmed from 1s (found 2026-07-28, speeding up bulk search).
+    time.sleep(0.6)
 
     # Address is merged from these 7 results-grid cells - must happen BEFORE
     # the drilldown click below, since (like the search box) this grid
@@ -339,7 +350,8 @@ def _search_one_number(driver, wait, mobile_input, mobile_number):
             )
         )
         driver.execute_script("arguments[0].click();", drilldown)
-        time.sleep(1.5)
+        # Trimmed from 1.5s (found 2026-07-28, speeding up bulk search).
+        time.sleep(0.8)
         print(f"[field-debug] drilldown clicked for {mobile_number}", flush=True)
     except Exception as e:
         # No result row to click — a genuine no-match. The field reads below

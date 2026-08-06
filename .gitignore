@@ -23,6 +23,11 @@
 /Gas/lpg_web/lpgtool.log
 /Gas/lpg_web/lpgtool_error.log
 
+# Real SDMS login for lpg_search.py's Selenium automation - see
+# Gas/lpg_web/config.py.example (found hardcoded directly in lpg_search.py
+# and already committed to git history 2026-08-07; moved out here).
+/Gas/lpg_web/config.py
+
 # Python bytecode cache
 __pycache__/
 *.pyc
