@@ -1,15 +1,13 @@
 <?php
 require __DIR__ . '/includes/auth.php';
 
-// Clearing this in the DB (not just the local PHP session) is what makes
-// logout actually observable from outside this browser tab (found
-// 2026-07-26) - previously session_token was only ever SET at login and
-// never cleared, so it stayed populated forever even after "logging out",
-// making it useless as a live "is this account currently logged in" signal
-// - isSessionValid() (includes/auth.php) is what checks it now.
+// Deleting THIS session's row (not every row for the user) is what makes
+// logout actually observable from outside this browser tab, without
+// signing the account out on its other concurrently-logged-in systems too
+// - isSessionValid() (includes/auth.php) is what checks user_sessions now.
 if (isLoggedIn()) {
-    $pdo->prepare('UPDATE users SET session_token = NULL WHERE id = :id')
-        ->execute(['id' => $_SESSION['user_id']]);
+    $pdo->prepare('DELETE FROM user_sessions WHERE user_id = :id AND session_token = :token')
+        ->execute(['id' => $_SESSION['user_id'], 'token' => (string) ($_SESSION['session_token'] ?? '')]);
 }
 
 $_SESSION = [];

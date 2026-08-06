@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $role      = ($_POST['role'] ?? 'agent') === 'admin' ? 'admin' : 'agent';
         $lpgAccess = isset($_POST['lpg_search_access']) ? 1 : 0;
         $panIndiaAccess = isset($_POST['pan_india_access']) ? 1 : 0;
+        $maxSessions = max(1, (int) ($_POST['max_concurrent_sessions'] ?? 1));
         $expiresDate  = trim($_POST['expires_date'] ?? '');
         $expiresTime  = trim($_POST['expires_time'] ?? '') ?: '00:00';
         $expiresAtSql = $expiresDate !== '' ? "$expiresDate $expiresTime:00" : null;
@@ -26,8 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'danger';
         } else {
             $stmt = $pdo->prepare(
-                'INSERT INTO users (username, password_hash, full_name, mobile_no, role, lpg_search_access, pan_india_access, expires_at)
-                 VALUES (:username, :hash, :full_name, :mobile_no, :role, :lpg_access, :pan_india_access, :expires_at)'
+                'INSERT INTO users (username, password_hash, full_name, mobile_no, role, lpg_search_access, pan_india_access, max_concurrent_sessions, expires_at)
+                 VALUES (:username, :hash, :full_name, :mobile_no, :role, :lpg_access, :pan_india_access, :max_sessions, :expires_at)'
             );
             try {
                 $stmt->execute([
@@ -38,6 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'role'      => $role,
                     'lpg_access'=> $lpgAccess,
                     'pan_india_access' => $panIndiaAccess,
+                    'max_sessions' => $maxSessions,
                     'expires_at'=> $expiresAtSql,
                 ]);
                 $message = "Account <strong>" . htmlspecialchars($username) . "</strong> created successfully.";
@@ -54,6 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $role     = ($_POST['role'] ?? 'agent') === 'admin' ? 'admin' : 'agent';
         $lpgAccess = isset($_POST['lpg_search_access']) ? 1 : 0;
         $panIndiaAccess = isset($_POST['pan_india_access']) ? 1 : 0;
+        $maxSessions = max(1, (int) ($_POST['max_concurrent_sessions'] ?? 1));
         $newPassword  = $_POST['new_password'] ?? '';
         $expiresDate  = trim($_POST['expires_date'] ?? '');
         $expiresTime  = trim($_POST['expires_time'] ?? '') ?: '00:00';
@@ -66,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message     = 'New password must be at least 6 characters (or leave it blank to keep the current one).';
             $messageType = 'danger';
         } else {
-            $sql = 'UPDATE users SET username = :username, full_name = :full_name, mobile_no = :mobile_no, role = :role, lpg_search_access = :lpg_access, pan_india_access = :pan_india_access, expires_at = :expires_at';
+            $sql = 'UPDATE users SET username = :username, full_name = :full_name, mobile_no = :mobile_no, role = :role, lpg_search_access = :lpg_access, pan_india_access = :pan_india_access, max_concurrent_sessions = :max_sessions, expires_at = :expires_at';
             $params = [
                 'username'  => $username,
                 'full_name' => $fullName,
@@ -74,18 +77,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'role'      => $role,
                 'lpg_access'=> $lpgAccess,
                 'pan_india_access' => $panIndiaAccess,
+                'max_sessions' => $maxSessions,
                 'expires_at'=> $expiresAtSql,
                 'id'        => $id,
             ];
-            // Changing the password invalidates that account's current session — if the
-            // password was changed because it leaked, the old session shouldn't survive it.
             if ($newPassword !== '') {
-                $sql .= ', password_hash = :hash, session_token = NULL';
+                $sql .= ', password_hash = :hash';
                 $params['hash'] = password_hash($newPassword, PASSWORD_DEFAULT);
             }
             $sql .= ' WHERE id = :id';
             try {
                 $pdo->prepare($sql)->execute($params);
+                // Changing the password signs out every active session for this
+                // account (all systems, not just one) — if it was changed
+                // because it leaked, no old session should survive it.
+                if ($newPassword !== '') {
+                    $pdo->prepare('DELETE FROM user_sessions WHERE user_id = :id')->execute(['id' => $id]);
+                } else {
+                    // Lowering the limit takes effect immediately (oldest
+                    // sessions trimmed now) rather than waiting for this
+                    // account's next login to trigger the same cleanup.
+                    $pdo->prepare(
+                        "DELETE FROM user_sessions WHERE user_id = :id AND id NOT IN (
+                            SELECT id FROM (
+                                SELECT id FROM user_sessions WHERE user_id = :id2 ORDER BY created_at DESC, id DESC LIMIT $maxSessions
+                            ) AS keep_ids
+                        )"
+                    )->execute(['id' => $id, 'id2' => $id]);
+                }
                 $message = "Account <strong>" . htmlspecialchars($username) . "</strong> updated successfully.";
             } catch (PDOException $e) {
                 $message     = 'Could not update account — username may already be taken.';
@@ -141,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $users = $pdo->query(
-    'SELECT id, username, full_name, mobile_no, role, is_active, lpg_search_access, lpg_bookmarklet_key, pan_india_access, expires_at, created_at, last_login_at FROM users ORDER BY created_at DESC'
+    'SELECT id, username, full_name, mobile_no, role, is_active, lpg_search_access, lpg_bookmarklet_key, pan_india_access, max_concurrent_sessions, expires_at, created_at, last_login_at FROM users ORDER BY created_at DESC'
 )->fetchAll();
 
 // Summary stats for the admin view. "Logged In" counts users who have ever
@@ -226,6 +245,11 @@ require __DIR__ . '/../includes/header.php';
     <label style="display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap;color:var(--c-text)">
       <input type="checkbox" name="pan_india_access" value="1" style="width:auto"> Pan India Access
     </label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap;color:var(--c-text)"
+           title="How many systems this account can be logged into at the same time">
+      Max Logins
+      <input type="number" name="max_concurrent_sessions" value="1" min="1" max="50" style="width:56px">
+    </label>
     <input type="text" name="expires_date" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" maxlength="10"
            title="Expiry date, DD/MM/YYYY (leave blank for no expiry)" style="min-width:140px">
     <input type="time" name="expires_time" title="Expiry time (defaults to 00:00)" style="min-width:110px">
@@ -261,8 +285,10 @@ require __DIR__ . '/../includes/header.php';
           <th style="width:120px">Username</th>
           <th style="width:80px">Role</th>
           <th style="width:85px">Status</th>
+          <th style="width:105px">Access to LPG</th>
+          <th style="width:115px">Pan India</th>
           <th style="width:340px">Set Expiry</th>
-          <th style="width:170px">Actions</th>
+          <th style="width:220px">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -287,6 +313,16 @@ require __DIR__ . '/../includes/header.php';
           </td>
           <td><span class="badge <?= $statusClass ?>"><?= $statusLabel ?></span></td>
           <td>
+            <span class="badge <?= $u['lpg_search_access'] ? 'badge-success' : 'badge-neutral' ?>">
+              <?= $u['lpg_search_access'] ? 'Granted' : 'Not Granted' ?>
+            </span>
+          </td>
+          <td>
+            <span class="badge <?= $u['pan_india_access'] ? 'badge-success' : 'badge-neutral' ?>">
+              <?= $u['pan_india_access'] ? 'Granted' : 'Not Granted' ?>
+            </span>
+          </td>
+          <td>
             <div style="display:flex;flex-direction:column;gap:0;">
             <form method="post" class="expiry-form" style="margin:0;">
               <input type="hidden" name="action" value="set_expiry">
@@ -310,9 +346,25 @@ require __DIR__ . '/../includes/header.php';
           </td>
           <td class="action-cell">
             <button type="button" class="btn btn-sm btn-secondary agents-action-btn"
-                    onclick="openEditModal(<?= (int) $u['id'] ?>, <?= htmlspecialchars(json_encode($u['username']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['full_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['mobile_no'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['role']), ENT_QUOTES) ?>, <?= (int) $u['lpg_search_access'] ?>, <?= (int) $u['pan_india_access'] ?>, <?= htmlspecialchars(json_encode($expiryDateValue), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($expiryTimeValue), ENT_QUOTES) ?>)">
+                    onclick="openEditModal(<?= (int) $u['id'] ?>, <?= htmlspecialchars(json_encode($u['username']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['full_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['mobile_no'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['role']), ENT_QUOTES) ?>, <?= (int) $u['lpg_search_access'] ?>, <?= (int) $u['pan_india_access'] ?>, <?= (int) $u['max_concurrent_sessions'] ?>, <?= htmlspecialchars(json_encode($expiryDateValue), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($expiryTimeValue), ENT_QUOTES) ?>)">
               <i class="bi bi-pencil-square"></i> Edit
             </button>
+            <form method="post" style="display:inline">
+              <input type="hidden" name="action" value="toggle_lpg">
+              <input type="hidden" name="id"     value="<?= (int) $u['id'] ?>">
+              <button type="submit" class="btn btn-sm agents-action-btn agents-btn-lpg <?= $u['lpg_search_access'] ? 'btn-warning' : 'btn-secondary' ?>"
+                      title="<?= $u['lpg_search_access'] ? 'Revoke LPG Search access' : 'Grant LPG Search access' ?>">
+                <i class="bi bi-fuel-pump-fill"></i> <?= $u['lpg_search_access'] ? 'Revoke LPG' : 'Grant LPG' ?>
+              </button>
+            </form>
+            <form method="post" style="display:inline">
+              <input type="hidden" name="action" value="toggle_pan_india">
+              <input type="hidden" name="id"     value="<?= (int) $u['id'] ?>">
+              <button type="submit" class="btn btn-sm agents-action-btn agents-btn-panindia <?= $u['pan_india_access'] ? 'btn-warning' : 'btn-secondary' ?>"
+                      title="<?= $u['pan_india_access'] ? 'Revoke Pan India access' : 'Grant Pan India access' ?>">
+                <i class="bi bi-globe-asia-australia"></i> <?= $u['pan_india_access'] ? 'Revoke Pan India' : 'Grant Pan India' ?>
+              </button>
+            </form>
             <?php if ($u['lpg_search_access'] && $u['lpg_bookmarklet_key']): ?>
               <form method="post" style="display:inline"
                     onsubmit="return confirm('Reset <?= htmlspecialchars($u['username'], ENT_QUOTES) ?>\'s LPG bookmarklet? Their current one will stop working until they revisit LPG Search.')">
@@ -385,6 +437,12 @@ require __DIR__ . '/../includes/header.php';
         </label>
       </div>
       <div class="form-group">
+        <label class="form-label" for="edit-max_concurrent_sessions">Max Simultaneous Logins</label>
+        <input type="number" class="form-control" name="max_concurrent_sessions" id="edit-max_concurrent_sessions"
+               value="1" min="1" max="50" style="max-width:100px">
+        <div class="text-sm text-muted" style="margin-top:4px">How many systems this account can be logged into at once. Lowering it signs out the oldest session(s) immediately.</div>
+      </div>
+      <div class="form-group">
         <label class="form-label">Expiry Date &amp; Time</label>
         <div style="display:flex;gap:8px">
           <input type="text" class="form-control" name="expires_date" id="edit-expires_date"
@@ -411,7 +469,7 @@ require __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
-function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, panIndiaAccess, expiresDate, expiresTime) {
+function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, panIndiaAccess, maxSessions, expiresDate, expiresTime) {
   document.getElementById('edit-id').value = id;
   document.getElementById('edit-username').value = username;
   document.getElementById('edit-full_name').value = fullName;
@@ -419,6 +477,7 @@ function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, panInd
   document.getElementById('edit-role').value = role;
   document.getElementById('edit-lpg_search_access').checked = !!lpgAccess;
   document.getElementById('edit-pan_india_access').checked = !!panIndiaAccess;
+  document.getElementById('edit-max_concurrent_sessions').value = maxSessions || 1;
   document.getElementById('edit-expires_date').value = expiresDate;
   document.getElementById('edit-expires_time').value = expiresTime;
   document.getElementById('edit-new_password').value = '';

@@ -845,12 +845,16 @@ div.dataTables_wrapper .dataTables_paginate .paginate_button.disabled:hover{
   border-color:var(--c-accent);box-shadow:0 0 0 3px var(--c-accent-glow);
 }
 .action-cell{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;}
+/* Grant/Revoke share one button, and "Revoke ..." is always longer than
+   "Grant ..." - without a fixed width per button role, that length swap
+   shifted every button after it sideways row to row, so the same action
+   never lined up in the same spot on two consecutive rows. */
 .agents-action-btn{justify-content:center;}
-/* #accounts-table overrides table.results-table's forced width:100% - with
-   only 6 narrow columns left (LPG/Pan India badge + toggle columns were
-   removed), stretching to the full card width left "Set Expiry" ballooning
-   to absorb all the leftover space. Sizing to actual column content
-   instead keeps it compact rather than artificially wide. */
+.agents-btn-lpg{min-width:104px;}
+.agents-btn-panindia{min-width:148px;}
+/* #accounts-table overrides table.results-table's forced width:100% -
+   sizing to actual column content instead of always stretching to the full
+   card width keeps it compact rather than artificially wide. */
 #accounts-table{width:auto!important;}
 .expiry-form{display:flex;gap:6px;align-items:center;}
 .expiry-form input[type="datetime-local"],

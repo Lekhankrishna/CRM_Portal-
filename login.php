@@ -21,12 +21,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($user['expires_at'] !== null && strtotime($user['expires_at']) <= time()) {
             $error = 'This account has expired. Please contact an administrator.';
         } else {
-            // A fresh token here invalidates any session already open elsewhere for
-            // this user — the next request on that older session will see a
-            // mismatch against this new DB value and get signed out automatically.
             $token = bin2hex(random_bytes(32));
-            $pdo->prepare('UPDATE users SET session_token = :token, last_login_at = NOW() WHERE id = :id')
-                ->execute(['token' => $token, 'id' => $user['id']]);
+            $pdo->prepare('UPDATE users SET last_login_at = NOW() WHERE id = :id')
+                ->execute(['id' => $user['id']]);
+            $pdo->prepare('INSERT INTO user_sessions (user_id, session_token) VALUES (:id, :token)')
+                ->execute(['id' => $user['id'], 'token' => $token]);
+
+            // Evict the oldest session(s) beyond this account's allowed
+            // concurrent-login count, keeping only the newest N (the one
+            // just created included) - this is what actually signs an
+            // over-the-limit device out, on ITS next request
+            // (isSessionValid() finds its token's row gone). Interpolated
+            // as a cast int, not bound, since MySQL's LIMIT is fussy about
+            // placeholders across PDO driver configs.
+            $maxSessions = max(1, (int) $user['max_concurrent_sessions']);
+            $pdo->prepare(
+                "DELETE FROM user_sessions WHERE user_id = :id AND id NOT IN (
+                    SELECT id FROM (
+                        SELECT id FROM user_sessions WHERE user_id = :id2 ORDER BY created_at DESC, id DESC LIMIT $maxSessions
+                    ) AS keep_ids
+                )"
+            )->execute(['id' => $user['id'], 'id2' => $user['id']]);
 
             session_regenerate_id(true);
             $_SESSION['user_id']       = $user['id'];
