@@ -23,6 +23,11 @@
 /Gas/lpg_web/lpgtool.log
 /Gas/lpg_web/lpgtool_error.log
 
+# Real SDMS login for lpg_search.py's Selenium automation - see
+# Gas/lpg_web/config.py.example (found hardcoded directly in lpg_search.py
+# and already committed to git history 2026-08-07; moved out here).
+/Gas/lpg_web/config.py
+
 # PAN India Telegram credentials and the local worker's whole runtime
 # directory (downloaded PHP loader/PHAR, QR-authorized session, logs) -
 # entirely machine-specific and regenerated on demand, nothing in it is source.
