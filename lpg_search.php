@@ -83,25 +83,63 @@ require __DIR__ . '/includes/header.php';
   .lpg-cell-empty{color:#aaa;}
   .lpg-error-row td{color:#f87171;}
   .lpg-error-row .lpg-cell-name::before{content:"Not found";font-weight:700;}
+
+  /* Single/Bulk mode tabs - same shape as advanced_search.php's .as-tabs. */
+  .lpg-tabs{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .lpg-tab{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:999px;
+    border:1px solid #e2e2ea;background:#fff;font-size:12.5px;font-weight:600;color:#555;
+    cursor:pointer;transition:all 150ms;white-space:nowrap;}
+  .lpg-tab i{font-size:14px;}
+  .lpg-tab:hover{border-color:#4f46e5;color:#4f46e5;}
+  .lpg-tab.active{background:#4f46e5;border-color:#4f46e5;color:#fff;box-shadow:0 4px 14px rgba(79,70,229,.35);}
+  .lpg-textarea{width:100%;height:110px;padding:9px 14px;font-size:13px;color:#333;
+    border:1px solid #e0e0e0;border-radius:9px;background:#fff;resize:vertical;outline:none;}
+  .lpg-textarea:focus{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.25);}
 </style>
 
-<div class="lpg-card">
-  <div class="lpg-card-body">
-    <input type="text" id="lpgNumberBox" placeholder="9876543210"
-           style="width:100%;padding:11px 16px;font-size:13px;color:#333;border:1px solid #e0e0e0;border-radius:9px;background:#fff;outline:none;">
-    <div class="lpg-row">
-      <button id="lpgSearchBtn" class="lpg-btn">Search</button>
-      <button id="lpgClearBtn" class="lpg-btn lpg-btn-secondary" type="button">Clear</button>
-      <button id="lpgRefreshBtn" class="lpg-btn lpg-btn-secondary" type="button">Refresh</button>
-      <span id="lpgStatus"></span>
-    </div>
-    <div class="lpg-progress-wrap" id="lpgProgressWrap">
-      <div class="lpg-progress-track"><div class="lpg-progress-fill" id="lpgProgressFill"></div></div>
-      <div class="lpg-progress-meta">
-        <span id="lpgProgressLabel"></span>
-        <span id="lpgProgressEta"></span>
+<div class="lpg-tabs">
+  <button type="button" class="lpg-tab active" id="lpgTabSingle"><i class="bi bi-search"></i> Single Search</button>
+  <button type="button" class="lpg-tab" id="lpgTabBulk"><i class="bi bi-list-ol"></i> Bulk Search</button>
+</div>
+
+<div id="lpgSingleMode">
+  <div class="lpg-card">
+    <div class="lpg-card-body">
+      <input type="text" id="lpgNumberBox" placeholder="9876543210"
+             style="width:100%;padding:11px 16px;font-size:13px;color:#333;border:1px solid #e0e0e0;border-radius:9px;background:#fff;outline:none;">
+      <div class="lpg-row">
+        <button id="lpgSearchBtn" class="lpg-btn">Search</button>
+        <button id="lpgClearBtn" class="lpg-btn lpg-btn-secondary" type="button">Clear</button>
+        <button id="lpgRefreshBtn" class="lpg-btn lpg-btn-secondary" type="button">Refresh</button>
       </div>
     </div>
+  </div>
+</div>
+
+<div id="lpgBulkMode" style="display:none">
+  <div class="lpg-card">
+    <div class="lpg-card-body">
+      <textarea id="lpgBulkNumbersBox" class="lpg-textarea" placeholder="9876543210, 9876543211, ..."></textarea>
+      <div class="lpg-row">
+        <button id="lpgBulkSearchBtn" class="lpg-btn">Bulk Search</button>
+        <button id="lpgBulkClearBtn" class="lpg-btn lpg-btn-secondary" type="button">Clear</button>
+        <button id="lpgBulkRefreshBtn" class="lpg-btn lpg-btn-secondary" type="button">Refresh</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Shared status/progress/results - identical result shape for a single
+     search (one number) or a bulk search (many), so both modes feed the
+     same table/export/poll logic below rather than duplicating it per tab. -->
+<div class="lpg-row" style="margin-top:0">
+  <span id="lpgStatus"></span>
+</div>
+<div class="lpg-progress-wrap" id="lpgProgressWrap">
+  <div class="lpg-progress-track"><div class="lpg-progress-fill" id="lpgProgressFill"></div></div>
+  <div class="lpg-progress-meta">
+    <span id="lpgProgressLabel"></span>
+    <span id="lpgProgressEta"></span>
   </div>
 </div>
 
@@ -130,9 +168,19 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <script>
+const IS_ADMIN = <?= (currentUser()['role'] ?? '') === 'admin' ? 'true' : 'false' ?>;
+// 500 (not Infinity) even for admins - the backend (lpg_search.py's
+// run_bulk_search) has its own hard ceiling per job regardless of role, so
+// letting the UI accept more than that just means the excess gets silently
+// dropped server-side with no explanation.
+const BULK_NUMBER_LIMIT = IS_ADMIN ? 500 : 10;
+
 const searchBtn = document.getElementById("lpgSearchBtn");
 const clearBtn = document.getElementById("lpgClearBtn");
 const refreshBtn = document.getElementById("lpgRefreshBtn");
+const bulkSearchBtn = document.getElementById("lpgBulkSearchBtn");
+const bulkClearBtn = document.getElementById("lpgBulkClearBtn");
+const bulkNumbersBox = document.getElementById("lpgBulkNumbersBox");
 const exportBtn = document.getElementById("lpgExportBtn");
 const numberBox = document.getElementById("lpgNumberBox");
 const statusEl = document.getElementById("lpgStatus");
@@ -147,6 +195,34 @@ const progressEta = document.getElementById("lpgProgressEta");
 let pollTimer = null;
 let lastResults = [];
 let searchStartedAt = null;
+
+// Single Search and Bulk Search share one results table/progress bar/export
+// below both tabs (see the HTML) rather than each mode having its own copy -
+// a single-number search and a bulk search return the exact same result
+// shape, so there's nothing mode-specific left to render once you have the
+// `numbers` array.
+const tabSingle = document.getElementById("lpgTabSingle");
+const tabBulk = document.getElementById("lpgTabBulk");
+const singleMode = document.getElementById("lpgSingleMode");
+const bulkMode = document.getElementById("lpgBulkMode");
+
+function showMode(mode) {
+  const isBulk = mode === "bulk";
+  tabBulk.classList.toggle("active", isBulk);
+  tabSingle.classList.toggle("active", !isBulk);
+  bulkMode.style.display = isBulk ? "" : "none";
+  singleMode.style.display = isBulk ? "none" : "";
+}
+tabSingle.addEventListener("click", () => showMode("single"));
+tabBulk.addEventListener("click", () => showMode("bulk"));
+// Deep-link support for the old lpg_bulk_search.php URL, which now redirects
+// here with ?mode=bulk instead of hosting its own copy of this page.
+if (new URLSearchParams(location.search).get("mode") === "bulk") showMode("bulk");
+
+function setSearching(isSearching) {
+  searchBtn.disabled = isSearching;
+  bulkSearchBtn.disabled = isSearching;
+}
 
 function formatDuration(seconds) {
   seconds = Math.max(0, Math.round(seconds));
@@ -275,7 +351,7 @@ function poll(jobId) {
 
       if (data.status === "completed" || data.status === "failed") {
         clearInterval(pollTimer);
-        searchBtn.disabled = false;
+        setSearching(false);
         if (data.status === "failed") {
           statusEl.textContent = `Failed: ${data.error || "unknown error"}`;
           progressWrap.style.display = "none";
@@ -289,36 +365,31 @@ function poll(jobId) {
     } catch (pollErr) {
       clearInterval(pollTimer);
       statusEl.textContent = `Lost connection while checking status: ${pollErr.message}`;
-      searchBtn.disabled = false;
+      setSearching(false);
       progressWrap.style.display = "none";
     }
   }, 2000);
 }
 
-searchBtn.addEventListener("click", async () => {
-  // Strips more than surrounding whitespace - a number pasted in the
-  // common "XXXXX XXXXX" Indian formatting (or with dashes) would
-  // otherwise be sent with the punctuation still in it and silently fail
-  // to match anything (found 2026-08-05, same root cause as bulk search's
-  // parseNumbers()).
-  const number = numberBox.value.replace(/\D+/g, "");
-
-  if (!number) {
-    statusEl.textContent = "Enter a mobile number.";
+// Shared by both Single Search (numbers.length === 1) and Bulk Search - see
+// the comment above setSearching().
+async function startSearch(numbers) {
+  if (numbers.length === 0) {
+    statusEl.textContent = "Enter at least one valid mobile number.";
     return;
   }
 
-  searchBtn.disabled = true;
+  setSearching(true);
   statusEl.textContent = "Starting search...";
   renderResults([]);
   searchStartedAt = Date.now();
-  updateProgress(0, 1, "processing");
+  updateProgress(0, numbers.length, "processing");
 
   try {
     const res = await fetch("lpg_search_api.php?action=start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ numbers: [number] })
+      body: JSON.stringify({ numbers })
     });
 
     const data = await res.json();
@@ -328,18 +399,32 @@ searchBtn.addEventListener("click", async () => {
     }
     if (!res.ok) {
       statusEl.textContent = `Error: ${data.error || "could not start search"}`;
-      searchBtn.disabled = false;
+      setSearching(false);
       progressWrap.style.display = "none";
       return;
     }
 
-    statusEl.textContent = "Status: processing (0/1)";
+    statusEl.textContent = `Status: processing (0/${numbers.length})`;
     poll(data.jobId);
   } catch (err) {
     statusEl.textContent = `Could not reach the server: ${err.message}`;
-    searchBtn.disabled = false;
+    setSearching(false);
     progressWrap.style.display = "none";
   }
+}
+
+searchBtn.addEventListener("click", () => {
+  // Strips more than surrounding whitespace - a number pasted in the
+  // common "XXXXX XXXXX" Indian formatting (or with dashes) would
+  // otherwise be sent with the punctuation still in it and silently fail
+  // to match anything (found 2026-08-05, same root cause as parseNumbers()
+  // below).
+  const number = numberBox.value.replace(/\D+/g, "");
+  if (!number) {
+    statusEl.textContent = "Enter a mobile number.";
+    return;
+  }
+  startSearch([number]);
 });
 
 numberBox.addEventListener("keydown", (e) => {
@@ -352,11 +437,47 @@ clearBtn.addEventListener("click", () => {
   statusEl.textContent = "";
   renderResults([]);
   progressWrap.style.display = "none";
-  searchBtn.disabled = false;
+  setSearching(false);
   stopConfetti();
 });
 
 refreshBtn.addEventListener("click", () => location.reload());
+// A plain reload() would drop back to the Single Search tab (the default on
+// page load without ?mode=bulk) - navigating with that param instead keeps
+// Bulk Search active after the refresh.
+document.getElementById("lpgBulkRefreshBtn").addEventListener("click", () => {
+  location.href = "lpg_search.php?mode=bulk";
+});
+
+// Same number-parsing/merging as before (dash/space-formatted numbers,
+// "XXXXX XXXXX" split-in-two paste artifacts), capped per BULK_NUMBER_LIMIT.
+function parseBulkNumbers(raw) {
+  const tokens = raw.split(/[\s,]+/).map(s => s.trim()).filter(s => s.length > 0);
+  const merged = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const cur = tokens[i].replace(/\D+/g, "");
+    const next = tokens[i + 1] ? tokens[i + 1].replace(/\D+/g, "") : "";
+    if (cur.length === 5 && next.length === 5) {
+      merged.push(cur + next);
+      i++;
+    } else if (cur.length > 0) {
+      merged.push(cur);
+    }
+  }
+  return merged.slice(0, BULK_NUMBER_LIMIT);
+}
+
+bulkSearchBtn.addEventListener("click", () => startSearch(parseBulkNumbers(bulkNumbersBox.value)));
+
+bulkClearBtn.addEventListener("click", () => {
+  if (pollTimer) clearInterval(pollTimer);
+  bulkNumbersBox.value = "";
+  statusEl.textContent = "";
+  renderResults([]);
+  progressWrap.style.display = "none";
+  setSearching(false);
+  stopConfetti();
+});
 </script>
 
 <?php require __DIR__ . '/includes/footer.php'; ?>

@@ -4,30 +4,28 @@ requirePanIndiaAccess();
 $user = currentUser();
 require __DIR__ . '/includes/header.php';
 ?>
+<div class="page-header" style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
+  <h1 class="page-title" style="margin:0"><i class="bi bi-search"></i> Pan India Search</h1>
+</div>
+
 <div class="pan-page">
-  <div class="pan-heading">
-    <div>
-      <div class="pan-kicker">PAN INDIA SEARCH</div>
-      <h1>Search available records</h1>
-      <p>Search by email, Aadhaar number, or contact number.</p>
-    </div>
-    <div class="pan-connect" id="pan-connect" hidden>
-    </div>
-  </div>
+  <div class="pan-connect" id="pan-connect" hidden></div>
 
   <form class="pan-search-card" id="pan-search-form">
     <div class="pan-tabs" role="tablist" aria-label="Search method">
-      <button type="button" class="pan-tab" data-type="email" role="tab">Email</button>
-      <button type="button" class="pan-tab" data-type="aadhaar" role="tab">Aadhaar Number</button>
-      <button type="button" class="pan-tab active" data-type="contact" role="tab" aria-selected="true">Contact Number</button>
+      <button type="button" class="pan-tab" data-type="email" role="tab"><i class="bi bi-envelope"></i> Email</button>
+      <button type="button" class="pan-tab" data-type="aadhaar" role="tab"><i class="bi bi-person-vcard"></i> Aadhaar Number</button>
+      <button type="button" class="pan-tab active" data-type="contact" role="tab" aria-selected="true"><i class="bi bi-telephone"></i> Contact Number</button>
     </div>
     <div class="pan-search-row">
       <label class="sr-only" for="pan-query">Contact Number</label>
       <div class="pan-input-wrap">
         <input id="pan-query" type="tel" inputmode="tel" autocomplete="off" placeholder="Enter mobile number" required>
       </div>
-      <button class="pan-search-btn" id="pan-search-btn" type="submit">Search</button>
-      <button class="pan-clear-btn" id="pan-clear-btn" type="button">Clear</button>
+      <div class="pan-actions">
+        <button class="pan-search-btn" id="pan-search-btn" type="submit"><i class="bi bi-search"></i> Search</button>
+        <button class="pan-clear-btn" id="pan-clear-btn" type="button">Clear</button>
+      </div>
     </div>
   </form>
 

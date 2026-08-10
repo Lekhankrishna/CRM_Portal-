@@ -76,15 +76,13 @@ if (hasHpGasAccess()) {
 // Search") now that HP LPG Search also exists, so the two aren't ambiguous
 // in the sidebar.
 if (hasLpgSearchAccess()) {
-    // lpg_search.php (2026-07-21) embeds the Flask bulk-search tool
-    // (Gas/lpg_web/app.py, port 9196) in an iframe instead of linking
-    // straight to it, so it opens inside the CRM's own layout/sidebar rather
-    // than as a separate tab/window pointed at a bare port number.
+    // Single Search and Bulk Search used to be two separate pages/sidebar
+    // entries (lpg_search.php / lpg_bulk_search.php); combined into one page
+    // with mode tabs (2026-08-11, same tabbed pattern as hp_gas.php) since
+    // both hit the same Flask backend and render an identical results table -
+    // lpg_bulk_search.php now just redirects here with ?mode=bulk for any
+    // old bookmarks/links.
     $searchRegionsExtra[] = ['label' => 'Indian LPG Search', 'href' => 'lpg_search.php'];
-    // Separate page (2026-07-24) - single-number quick search above, the
-    // original multi-number textarea tool here. Same Flask server, just a
-    // different route ("/bulk" vs "/") - see lpg_bulk_search.php.
-    $searchRegionsExtra[] = ['label' => 'Indian LPG Bulk Search', 'href' => 'lpg_bulk_search.php'];
 }
 $selectedState = $_GET['state'] ?? '';
 
@@ -185,10 +183,6 @@ $expiresLabel = $expiresAt ? date('d-F-Y', strtotime($expiresAt)) : null;
           <span class="sidebar__icon" style="color:rgb(<?= sidebarNavColor($thisColorIndex) ?>)"><i class="bi <?= $item['icon'] ?>"></i></span> <?= htmlspecialchars($item['label']) ?>
         </a>
       <?php endforeach; endif; ?>
-      <button type="button" id="theme-toggle-btn" class="sidebar__item">
-        <span class="sidebar__icon"><i class="bi bi-moon-stars-fill" id="theme-toggle-icon"></i></span>
-        <span id="theme-toggle-label">Dark Mode</span>
-      </button>
     </nav>
 
     <div class="sidebar__footer">
@@ -205,6 +199,15 @@ $expiresLabel = $expiresAt ? date('d-F-Y', strtotime($expiresAt)) : null;
 
   <div class="app-main">
     <div class="app-topbar">
+      <!-- Mobile-only (see .app-topbar__menu-btn's @media rule) - the
+           sidebar's own #sidebar-toggle button lives inside <aside>, which
+           is exactly what's translated off-screen on narrow viewports
+           (see .sidebar's @media(max-width:768px) rule), so without a
+           second toggle out here the sidebar becomes completely
+           unreachable below that width, not just hidden. -->
+      <button class="app-topbar__menu-btn" id="mobile-sidebar-toggle" type="button" aria-label="Open menu">
+        <i class="bi bi-list"></i>
+      </button>
       <div class="app-topbar__expiry">
         <i class="bi bi-calendar3"></i>
         <?= $expiresLabel ? 'Expires: ' . htmlspecialchars($expiresLabel) : 'No expiry' ?>

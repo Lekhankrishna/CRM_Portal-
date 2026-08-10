@@ -41,77 +41,67 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <style>
-  /* Dark purple/pink/cyan palette (2026-08-09) matching the vendor's own
-     site design, instead of this app's usual white-card indigo tool
-     styling (rc_print.php/hp_gas.php/advance_pan_india.php) - deliberately
-     distinct so this page still doesn't NAME the vendor anywhere, but reads
-     as visually "from" that tool. */
-  .pip-card{background:#1a0f2e;border-radius:12px;border:1px solid rgba(168,85,247,.25);
-    box-shadow:0 0 30px rgba(168,85,247,.12);overflow:hidden;}
+  /* Same tokens/shape as rc_print.php/hp_gas.php/advance_pan_india.php's
+     cards - matches this app's usual white-card indigo tool styling rather
+     than a one-off vendor-matched dark palette. */
+  .pip-card{background:var(--c-surface,#fff);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;}
   .pip-card-body{padding:16px 18px;}
   .pip-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;}
-  .pip-field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#9ca3af;margin-bottom:4px;}
-  .pip-field input{width:100%;padding:10px 12px;font-size:13px;color:#fff;border:1px solid #4b5563;border-radius:8px;
-    background:#2D1B4E;outline:none;transition:border-color 150ms,box-shadow 150ms;}
-  .pip-field input::placeholder{color:#6b7280;}
-  .pip-field input:focus{border-color:#ec4899;box-shadow:0 0 0 3px rgba(236,72,153,.2);}
+  .pip-field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#777;margin-bottom:4px;}
+  .pip-field input{width:100%;padding:10px 12px;font-size:13px;color:#333;border:1px solid #e0e0e0;border-radius:8px;
+    background:#fff;outline:none;transition:border-color 150ms,box-shadow 150ms;}
+  .pip-field input:focus{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.15);}
   .pip-row{display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap;}
-  .pip-btn{padding:11px 26px;border-radius:9px;border:none;
-    background:linear-gradient(90deg,#ec4899,#ef4444);color:#fff;
+  .pip-btn{padding:11px 26px;border-radius:9px;border:none;background:#4f46e5;color:#fff;
     font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;
-    transition:all 150ms;box-shadow:0 4px 18px rgba(236,72,153,.35);}
-  .pip-btn:hover:not(:disabled){background:linear-gradient(90deg,#db2777,#dc2626);transform:translateY(-1px);box-shadow:0 6px 20px rgba(236,72,153,.5);}
+    transition:all 150ms;box-shadow:0 4px 18px rgba(79,70,229,.3);}
+  .pip-btn:hover:not(:disabled){background:#4338ca;transform:translateY(-1px);box-shadow:0 6px 20px rgba(79,70,229,.45);}
   .pip-btn:disabled{opacity:.65;cursor:wait;transform:none;}
-  .pip-btn-secondary{background:#2D1B4E;color:#e5e7eb;border:1px solid #4b5563;box-shadow:none;}
-  .pip-btn-secondary:hover:not(:disabled){background:#3b2a5e;border-color:#ec4899;transform:none;box-shadow:none;}
+  .pip-btn-secondary{background:#fff;color:#333;border:1px solid #e0e0e0;box-shadow:none;}
+  .pip-btn-secondary:hover:not(:disabled){background:#eeeef6;border-color:#4f46e5;transform:none;box-shadow:none;}
   .pip-btn-excel{background:#10b981;color:#fff;box-shadow:0 4px 18px rgba(16,185,129,.3);}
   .pip-btn-excel:hover:not(:disabled){background:#0d9668;transform:translateY(-1px);box-shadow:0 6px 20px rgba(16,185,129,.45);}
-  #pipStatus{font-size:12.5px;color:#9ca3af;white-space:pre-wrap;word-break:break-word;font-weight:500;}
+  #pipStatus{font-size:12.5px;color:#555;white-space:pre-wrap;word-break:break-word;font-weight:500;}
   .pip-progress-wrap{margin-top:12px;display:none;}
-  .pip-progress-track{height:8px;border-radius:6px;background:#2D1B4E;overflow:hidden;border:1px solid #4b5563;}
-  .pip-progress-fill{height:100%;border-radius:6px;background:#ec4899;width:100%;
-    background-image:repeating-linear-gradient(45deg,#ec4899 0 12px,#ef4444 12px 24px);
+  .pip-progress-track{height:8px;border-radius:6px;background:#eeeef6;overflow:hidden;border:1px solid #e0e0e0;}
+  .pip-progress-fill{height:100%;border-radius:6px;background:#4f46e5;width:100%;
+    background-image:repeating-linear-gradient(45deg,#4f46e5 0 12px,#4338ca 12px 24px);
     background-size:34px 100%;animation:pip-progress-stripes 1s linear infinite;}
   @keyframes pip-progress-stripes{from{background-position:0 0;}to{background-position:-34px 0;}}
-  .pip-progress-meta{display:flex;justify-content:space-between;margin-top:6px;font-size:11.5px;color:#6b7280;}
-  .pip-result-wrap{background:#1a0f2e;border-radius:12px;border:1px solid rgba(168,85,247,.25);
-    box-shadow:0 0 30px rgba(168,85,247,.12);margin-top:16px;overflow-x:auto;display:none;}
-  .pip-result-toolbar{padding:10px 16px;background:#a855f7;color:#fff;font-size:11.5px;font-weight:700;
+  .pip-progress-meta{display:flex;justify-content:space-between;margin-top:6px;font-size:11.5px;color:#999;}
+  .pip-result-wrap{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-top:16px;overflow-x:auto;display:none;}
+  .pip-result-toolbar{padding:10px 16px;background:#4f46e5;color:#fff;font-size:11.5px;font-weight:700;
     text-transform:uppercase;letter-spacing:.3px;}
   .pip-table{width:100%;border-collapse:collapse;font-size:11.5px;}
-  .pip-table th{background:#2D1B4E;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;
-    letter-spacing:.3px;padding:8px;text-align:left;white-space:nowrap;border-bottom:1px solid #4b5563;}
-  .pip-table td{padding:8px;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:top;color:#e5e7eb;max-width:260px;word-break:break-word;}
-  .pip-no-results{background:#1a0f2e;border-radius:12px;border:1px solid rgba(168,85,247,.25);padding:16px;color:#9ca3af;}
+  .pip-table th{background:#eeeef6;color:#555;font-size:10px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.3px;padding:6px 8px;text-align:left;white-space:nowrap;border-bottom:1px solid #e0e0e0;}
+  .pip-table td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top;color:#333;max-width:260px;word-break:break-word;}
+  .pip-table tr:nth-child(even) td{background:#f8f8fc;}
+  .pip-no-results{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:16px;color:#777;}
 
-  /* Per-column colour coding (2026-08-09) matching the vendor's own results
-     table exactly (Name/Father's Name/Identity=slate, Mobile=pink,
-     Alt. Mobile=violet, Address=green, Alt. Address=coral, Email=orange,
-     Reg. Year=cyan) - same nth-child convention already used for this in
-     lpg_search.php/index.php, just re-tuned to sit on this page's dark
-     cards instead of light ones. */
-  .pip-table th:nth-child(1),.pip-table th:nth-child(4),.pip-table th:nth-child(9){background:#475569;}
-  .pip-table th:nth-child(2){background:#ec4899;}
-  .pip-table th:nth-child(3){background:#8b5cf6;}
-  .pip-table th:nth-child(5){background:#34d399;}
-  .pip-table th:nth-child(6){background:#f87171;}
-  .pip-table th:nth-child(7){background:#f97316;}
-  .pip-table th:nth-child(8){background:#38bdf8;}
-  /* Same solid colour as the header, carried down the full column - not
-     just a subtle tint (per explicit instruction: "give same as header"). */
-  .pip-table td:nth-child(1),.pip-table td:nth-child(4),.pip-table td:nth-child(9){background:#475569;color:#fff;}
-  .pip-table td:nth-child(2){background:#ec4899;color:#fff;}
-  .pip-table td:nth-child(3){background:#8b5cf6;color:#fff;}
-  .pip-table td:nth-child(5){background:#34d399;color:#0a2e22;}
-  .pip-table td:nth-child(6){background:#f87171;color:#3a0a0a;}
-  .pip-table td:nth-child(7){background:#f97316;color:#3a1c00;}
-  .pip-table td:nth-child(8){background:#38bdf8;color:#04283a;}
-  /* A dark chip rather than a colour-matched one - the whole cell is
-     already that column's colour now, so the badge just needs to read
-     clearly on top of any of them. */
+  /* Per-column colour coding (Name/Father's Name plain, Mobile=amber,
+     Alt. Mobile=pink, Address=green, Alt. Address=teal, Email=orange,
+     Reg. Year=cyan, Identity=blue) - same palette/nth-child convention and
+     light-theme header+tint+left-border treatment as lpg_search.php's
+     .lpg-table and pan_india.php's per-field highlighting, so this table
+     reads as "one of this app's tables" instead of a one-off dark theme. */
+  .pip-table th:nth-child(2){background:rgb(217,119,6);color:#fff;}
+  .pip-table th:nth-child(3){background:rgb(219,39,119);color:#fff;}
+  .pip-table th:nth-child(5){background:rgb(5,150,105);color:#fff;}
+  .pip-table th:nth-child(6){background:rgb(13,148,136);color:#fff;}
+  .pip-table th:nth-child(7){background:rgb(234,88,12);color:#fff;}
+  .pip-table th:nth-child(8){background:rgb(2,132,199);color:#fff;}
+  .pip-table th:nth-child(9){background:rgb(37,99,235);color:#fff;}
+  .pip-table td:nth-child(2){background:rgba(217,119,6,.08);border-left:3px solid rgba(217,119,6,.5);}
+  .pip-table td:nth-child(3){background:rgba(219,39,119,.08);border-left:3px solid rgba(219,39,119,.5);}
+  .pip-table td:nth-child(5){background:rgba(5,150,105,.08);border-left:3px solid rgba(5,150,105,.5);}
+  .pip-table td:nth-child(6){background:rgba(13,148,136,.08);border-left:3px solid rgba(13,148,136,.5);}
+  .pip-table td:nth-child(7){background:rgba(234,88,12,.08);border-left:3px solid rgba(234,88,12,.5);}
+  .pip-table td:nth-child(8){background:rgba(2,132,199,.08);border-left:3px solid rgba(2,132,199,.5);}
+  .pip-table td:nth-child(9){background:rgba(37,99,235,.08);border-left:3px solid rgba(37,99,235,.5);}
   .pip-cell-badge{font-family:'Consolas','Cascadia Code','Courier New',monospace;font-size:11.5px;font-weight:700;
-    padding:2px 8px;border-radius:5px;display:inline-block;letter-spacing:.2px;
-    background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.35);color:#fff;}
+    padding:1px 7px;border-radius:5px;display:inline-block;letter-spacing:.2px;
+    background:rgba(79,70,229,.1);border:1px solid rgba(79,70,229,.3);color:#4338ca;}
 </style>
 
 <div class="pip-card">

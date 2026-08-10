@@ -208,6 +208,16 @@ code{
   display:flex;align-items:center;justify-content:flex-end;gap:16px;
   padding:16px 28px 0;flex-wrap:wrap;
 }
+/* Hidden on desktop (the sidebar's own hamburger, inside <aside>, handles
+   it there) - shown only under the @media(max-width:768px) rule below,
+   where it's the ONLY way to open the sidebar at all. margin-right:auto
+   pushes it to the opposite end of this flex row from the
+   justify-content:flex-end items without disturbing their own alignment. */
+.app-topbar__menu-btn{
+  display:none;margin-right:auto;
+  background:none;border:1px solid var(--c-border);color:var(--c-text);
+  font-size:18px;line-height:1;padding:7px 10px;border-radius:var(--r-sm);cursor:pointer;
+}
 .app-topbar__expiry{
   font-size:12.5px;color:#777777;
   display:flex;align-items:center;gap:6px;font-weight:500;
@@ -340,6 +350,28 @@ code{
 }
 .sp-btn-export:hover{background:#0d9668;transform:translateY(-1px);
   box-shadow:0 6px 20px rgba(16,185,129,.45);}
+
+/* ── Confetti (2026-08-08, index.php) ──────────────────────────────────────── */
+/* Fixed to the right-hand content panel only - left offset matches the
+   sidebar's 212px width (see .sidebar) so it never covers the sidebar, and
+   spans the full panel height/width rather than being boxed into the
+   results card. pointer-events:none so it never blocks clicking anything
+   underneath - purely decorative, shown only while a search has found
+   results (see startConfetti()/stopConfetti() in index.php). Left offset
+   collapses to 0 on mobile alongside the sidebar (see responsive section). */
+.confetti-container{position:fixed;top:0;left:212px;right:0;bottom:0;z-index:250;overflow:hidden;pointer-events:none;}
+.confetti-piece{
+  position:absolute;top:-24px;opacity:.85;border-radius:1px;
+  animation-name:confetti-float;animation-timing-function:linear;animation-iteration-count:infinite;
+  will-change:transform;
+}
+@keyframes confetti-float{
+  0%  {transform:translate(0,0)                 rotate(var(--rot-start));}
+  25% {transform:translate(var(--sway),27vh)     rotate(calc(var(--rot-start) + 90deg));}
+  50% {transform:translate(0,55vh)               rotate(calc(var(--rot-start) + 180deg));}
+  75% {transform:translate(calc(var(--sway) * -1),82vh) rotate(calc(var(--rot-start) + 270deg));}
+  100%{transform:translate(0,112vh)              rotate(calc(var(--rot-start) + 360deg));}
+}
 
 /* ── Results wrapper ─────────────────────────────────────────────────────────── */
 .results-wrap{
@@ -953,8 +985,18 @@ ul.skipped-list li{margin-bottom:3px;}
     z-index:300;
     transform:translateX(-100%);transition:transform 200ms ease;
   }
-  .sidebar.sidebar--open{transform:translateX(0);box-shadow:0 0 30px rgba(0,0,0,.15);}
-  .app-main{margin-left:0;}
+  /* Opening the sidebar on mobile used to leave it floating as a shadowed
+     overlay on top of .app-main (still at margin-left:0 underneath it) -
+     the 30px shadow blur read as a visible gap/disconnect between the two
+     rather than one attached panel. Pushing .app-main over by the sidebar's
+     own width when open instead makes it match the desktop layout: sidebar
+     and content sit flush against each other, just like a normal
+     (non-mobile) page. */
+  .sidebar.sidebar--open{transform:translateX(0);}
+  .app-main{margin-left:0;transition:margin-left 200ms ease;}
+  .sidebar.sidebar--open + .app-main{margin-left:212px;}
+  .confetti-container{left:0;}
+  .app-topbar__menu-btn{display:inline-flex;align-items:center;}
   .app-topbar{padding:14px 16px 0;}
   .container{padding:16px 14px 40px;}
   .hero{padding:22px 20px;} .hero__stats{display:none;}
@@ -977,29 +1019,48 @@ ul.skipped-list li{margin-bottom:3px;}
   .sp-stat{min-width:56px;padding:4px 8px;}
 }
 
-/* PAN India search */
-.pan-page{max-width:1120px;margin:0 auto;}
-.pan-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin:12px 0 28px;}
-.pan-heading h1{margin:4px 0 8px;font-size:28px;color:var(--c-text);}
-.pan-heading p{margin:0;color:var(--c-text-muted);font-size:14px;}
-.pan-kicker{font-size:11px;font-weight:700;letter-spacing:.13em;color:var(--c-accent);}
-.pan-status{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;padding:8px 12px;border:1px solid var(--c-border);border-radius:999px;background:var(--c-surface);font-size:12px;color:var(--c-text-muted);}
+/* PAN India search - restyled (2026-08-11) to match the other tool pages'
+   white-card/indigo-pill-tab look (rc_print.php/hp_gas.php/advanced_search.php's
+   .as-card/.as-tabs/.as-btn) instead of this page's older underlined-tab,
+   theme-variable-driven design, which read as visually inconsistent with
+   the rest of the app. Fixed hex/rgba values used directly here (not the
+   --c-* custom properties) for the same reason lpg_search.php's .lpg-table
+   does: this page's own JS already hardcodes that same palette for its
+   result-column highlighting (classifyColumn() in the inline <script>
+   below), so the chrome now matches its own results table too. */
+/* .pan-page previously had max-width:1120px;margin:0 auto - removed
+   (2026-08-11): on wide screens that centered it with an empty gap between
+   the sidebar and this page's content, while every other tool page
+   (rc_print.php/hp_gas.php/advanced_search.php/etc.) just fills .container
+   flush-left with no such wrapper. */
+.pan-status{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;padding:8px 12px;border:1px solid #e0e0e0;border-radius:999px;background:#fff;font-size:12px;color:#777;}
 .pan-connect{display:flex;align-items:center;gap:9px;}
-.pan-login-link{padding:8px 12px;border-radius:999px;background:var(--c-accent);color:#fff;text-decoration:none;font-size:12px;font-weight:600;}
-.pan-search-card,.pan-results{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-lg);box-shadow:var(--shadow-sm);overflow:hidden;}
-.pan-tabs{display:flex;gap:4px;padding:10px 12px 0;border-bottom:1px solid var(--c-border);background:var(--c-surface-2);}
-.pan-tab{display:flex;align-items:center;gap:7px;padding:11px 16px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--c-text-muted);font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
-.pan-tab:hover{color:var(--c-text);}
-.pan-tab.active{color:var(--c-accent);border-bottom-color:var(--c-accent);}
-.pan-search-row{display:flex;gap:10px;padding:22px;}
-.pan-input-wrap{position:relative;display:flex;align-items:center;flex:1;min-width:0;}
-.pan-input-wrap input{width:100%;height:44px;padding:0 15px;border:1px solid var(--c-border);border-radius:var(--r-md);background:var(--c-surface-2);color:var(--c-text);font:inherit;font-size:14px;outline:none;}
-.pan-input-wrap input:focus{border-color:var(--c-accent);box-shadow:0 0 0 3px var(--c-accent-light);}
-.pan-search-btn,.pan-clear-btn{height:44px;padding:0 20px;border-radius:var(--r-md);font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
-.pan-search-btn{border:1px solid var(--c-accent);background:var(--c-accent);color:#fff;}
-.pan-search-btn:disabled{opacity:.65;cursor:wait;}
-.pan-clear-btn{border:1px solid var(--c-border);background:var(--c-surface);color:var(--c-text-muted);}
-.pan-alert{margin-top:16px;padding:12px 15px;border:1px solid rgba(239,68,68,.35);border-radius:var(--r-md);background:rgba(239,68,68,.08);color:#ef4444;font-size:13px;}
+.pan-connect:not(:empty){margin-bottom:14px;}
+.pan-login-link{padding:8px 12px;border-radius:999px;background:#4f46e5;color:#fff;text-decoration:none;font-size:12px;font-weight:600;}
+.pan-search-card,.pan-results{background:var(--c-surface,#fff);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;border:none;}
+.pan-tabs{display:flex;gap:10px;flex-wrap:wrap;padding:18px 20px 0;border-bottom:none;background:transparent;}
+.pan-tab{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:999px;
+  border:1px solid #e2e2ea;background:#fff;color:#555;font:inherit;font-size:12.5px;font-weight:600;
+  cursor:pointer;transition:all 150ms;white-space:nowrap;}
+.pan-tab i{font-size:14px;}
+.pan-tab:hover{border-color:#4f46e5;color:#4f46e5;}
+.pan-tab.active{background:#4f46e5;border-color:#4f46e5;color:#fff;box-shadow:0 4px 14px rgba(79,70,229,.35);}
+.pan-search-row{display:flex;gap:10px;padding:18px 20px 20px;flex-wrap:wrap;}
+/* Search/Clear on their own row below the input - flex-basis:100% on this
+   flex-wrap:wrap row is what forces it to the next line regardless of how
+   much space is left, same trick as ecommerce.php's .sp-actions. */
+.pan-actions{display:flex;gap:10px;flex-basis:100%;}
+.pan-input-wrap{position:relative;display:flex;align-items:center;flex:1;min-width:220px;}
+.pan-input-wrap input{width:100%;padding:11px 16px;border:1px solid #e0e0e0;border-radius:9px;background:#fff;color:#333;font:inherit;font-size:13px;outline:none;}
+.pan-input-wrap input:focus{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.15);}
+.pan-search-btn,.pan-clear-btn{padding:11px 26px;border-radius:9px;font:inherit;font-size:12.5px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.4px;cursor:pointer;transition:all 150ms;}
+.pan-search-btn{border:none;background:#4f46e5;color:#fff;box-shadow:0 4px 18px rgba(79,70,229,.3);}
+.pan-search-btn:hover:not(:disabled){background:#4338ca;transform:translateY(-1px);box-shadow:0 6px 20px rgba(79,70,229,.45);}
+.pan-search-btn:disabled{opacity:.65;cursor:wait;transform:none;}
+.pan-clear-btn{border:1px solid #e0e0e0;background:#fff;color:#333;box-shadow:none;}
+.pan-clear-btn:hover{background:#eeeef6;border-color:#4f46e5;transform:none;}
+.pan-alert{margin-top:16px;padding:12px 15px;border:1px solid rgba(239,68,68,.35);border-radius:9px;background:rgba(239,68,68,.08);color:#ef4444;font-size:13px;}
 .pan-results{margin-top:22px;}
 .pan-results-heading{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--c-border);}
 .pan-results-heading h2{margin:3px 0 0;font-size:18px;}
@@ -1035,8 +1096,6 @@ table.results-table.pan-results-table tbody td{
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 
 @media(max-width:700px){
-  .pan-heading{display:block;}
-  .pan-status{margin-top:14px;}
   .pan-tabs{overflow-x:auto;}
   .pan-tab{white-space:nowrap;padding:10px 12px;}
   .pan-search-row{flex-wrap:wrap;padding:16px;}
