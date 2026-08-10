@@ -50,11 +50,14 @@ require __DIR__ . '/includes/header.php';
      this determines which of those a search actually hits rather than
      being cosmetic. */
   .as-state-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
-  /* Pill-shaped mode tabs with icons, matching the reference layout - one
-     row, active = solid indigo fill, inactive = light outline. */
+  /* Square-box tabs with icons (both the state row above and the mode row
+     below share this .as-tab class, so one change covers both) - active =
+     solid indigo fill, inactive = light outline. Radius matches this
+     page's own .as-btn/input fields (10px) rather than the fully pill-
+     shaped 999px used before, per explicit instruction. */
   .as-tabs{display:flex;gap:10px;flex-wrap:wrap;padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid #eee;}
   .as-tab[hidden]{display:none;}
-  .as-tab{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:999px;
+  .as-tab{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:10px;
     border:1px solid #e2e2ea;background:#fff;font-size:12.5px;font-weight:600;color:#555;
     cursor:pointer;transition:all 150ms;white-space:nowrap;}
   .as-tab i{font-size:14px;}
@@ -135,9 +138,9 @@ require __DIR__ . '/includes/header.php';
         <input type="text" id="asDobName" placeholder="Enter name...">
         <input type="text" id="asDob" placeholder="Date of Birth (dd/mm/yyyy)">
       </div>
-      <button id="asSearchBtn" class="as-btn"><i class="bi bi-search"></i> SEARCH</button>
     </div>
     <div class="as-row">
+      <button id="asSearchBtn" class="as-btn" style="padding:9px 18px"><i class="bi bi-search"></i> SEARCH</button>
       <button id="asClearBtn" class="as-btn as-btn-secondary" type="button">Clear</button>
       <button id="asExportBtn" class="as-btn as-btn-excel" type="button" disabled>
         <i class="bi bi-file-earmark-excel"></i> Download Excel

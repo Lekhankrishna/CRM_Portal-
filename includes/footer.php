@@ -45,32 +45,28 @@
 
 <script>
 (function(){
-  var toggle = document.getElementById('sidebar-toggle');
   var sidebar = document.getElementById('sidebar');
-  if (toggle && sidebar) {
-    toggle.addEventListener('click', function(){
-      sidebar.classList.toggle('sidebar--open');
-    });
-  }
+  // Two separate buttons toggle the same sidebar: #sidebar-toggle lives
+  // inside <aside> itself (desktop collapse), #mobile-sidebar-toggle lives
+  // in .app-topbar (the only way to open the sidebar on narrow viewports,
+  // since <aside> - and the button inside it - is translated off-screen
+  // there; see .app-topbar__menu-btn in assets/style.css).
+  ['sidebar-toggle', 'mobile-sidebar-toggle'].forEach(function(id){
+    var toggle = document.getElementById(id);
+    if (toggle && sidebar) {
+      toggle.addEventListener('click', function(){
+        sidebar.classList.toggle('sidebar--open');
+      });
+    }
+  });
 })();
 (function(){
-  var btn   = document.getElementById('theme-toggle-btn');
-  var icon  = document.getElementById('theme-toggle-icon');
-  var label = document.getElementById('theme-toggle-label');
-  function apply(theme){
-    document.documentElement.setAttribute('data-theme', theme);
-    if (icon)  icon.className  = theme === 'light' ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
-    if (label) label.textContent = theme === 'light' ? 'Light Mode' : 'Dark Mode';
-  }
-  var current = localStorage.getItem('crm-theme') || 'dark';
-  apply(current);
-  if (btn) {
-    btn.addEventListener('click', function(){
-      current = current === 'light' ? 'dark' : 'light';
-      localStorage.setItem('crm-theme', current);
-      apply(current);
-    });
-  }
+  // The Dark Mode toggle button is gone (removed 2026-08-11, per explicit
+  // instruction), but this still applies whatever theme was already saved
+  // to localStorage - from before the button existed, or the 'dark' default
+  // - so the choice a user already made keeps rendering correctly rather
+  // than silently reverting everyone to 'dark'.
+  document.documentElement.setAttribute('data-theme', localStorage.getItem('crm-theme') || 'dark');
 })();
 </script>
 <!-- Loaded on every page so any search page can call startConfetti()/

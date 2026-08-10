@@ -5,6 +5,14 @@ $user = currentUser();
 require __DIR__ . '/includes/header.php';
 ?>
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+<style>
+  /* Search/Clear moved to their own row below the input fields, this page
+     only - .sp-form/.sp-fields/.sp-btn are shared with index.php/pan_india.php
+     (assets/style.css), which weren't asked to change and keep the buttons
+     inline. flex-basis:100% on .sp-form's flex-wrap:wrap row is what forces
+     .sp-actions onto a new line regardless of how much space is left. */
+  #search-form .sp-actions{display:flex;gap:10px;flex-basis:100%;margin-top:10px;}
+</style>
 
 <!-- Confetti overlay - populated/cleared by startConfetti()/stopConfetti()
      (assets/confetti.js), only while a search has actually returned rows. -->
@@ -54,12 +62,14 @@ require __DIR__ . '/includes/header.php';
           <input class="sp-input" type="number" name="radius" placeholder="Radius (km)" min="0.1" step="0.1" style="max-width:140px">
         </div>
       </div>
-      <button type="submit" class="sp-btn" id="search-btn">
-        <i class="bi bi-search"></i> Search
-      </button>
-      <button type="button" class="sp-btn sp-btn-clear" id="clear-btn" onclick="clearSearch()">
-        <i class="bi bi-x-circle"></i> Clear
-      </button>
+      <div class="sp-actions">
+        <button type="submit" class="sp-btn" id="search-btn">
+          <i class="bi bi-search"></i> Search
+        </button>
+        <button type="button" class="sp-btn sp-btn-clear" id="clear-btn" onclick="clearSearch()">
+          <i class="bi bi-x-circle"></i> Clear
+        </button>
+      </div>
     </form>
   </div>
 

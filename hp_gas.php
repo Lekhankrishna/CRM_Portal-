@@ -72,8 +72,44 @@ require __DIR__ . '/includes/header.php';
   .hp-field-label{width:38%;color:#777;font-weight:600;text-transform:capitalize;}
   .hp-field-value{color:#222;font-weight:500;word-break:break-word;}
   .hp-not-found{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:16px;color:#f87171;font-weight:600;}
+
+  /* Bulk Search (admin-only, see $isAdmin below) - mode tabs match
+     advanced_search.php's .as-tabs/.as-tab exactly. */
+  .hp-tabs{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .hp-tab{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:999px;
+    border:1px solid #e2e2ea;background:#fff;font-size:12.5px;font-weight:600;color:#555;
+    cursor:pointer;transition:all 150ms;white-space:nowrap;}
+  .hp-tab i{font-size:14px;}
+  .hp-tab:hover{border-color:#4f46e5;color:#4f46e5;}
+  .hp-tab.active{background:#4f46e5;border-color:#4f46e5;color:#fff;box-shadow:0 4px 14px rgba(79,70,229,.35);}
+  .hp-textarea{width:100%;height:110px;padding:9px 14px;font-size:13px;color:#333;
+    border:1px solid #e0e0e0;border-radius:9px;background:#fff;resize:vertical;outline:none;}
+  .hp-textarea:focus{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.25);}
+  /* Overrides the single-search bar's always-indeterminate stripes with a
+     real done/total percentage, same as lpg_bulk_search.php's .lpg-progress-fill. */
+  .hp-progress-fill.determinate{background-image:none;animation:none;background:#4f46e5;
+    width:0%;transition:width .3s ease;}
+  .hp-bulk-item{margin-bottom:16px;}
+  .hp-bulk-item-header{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#eeeef6;
+    border-radius:10px 10px 0 0;font-size:12.5px;font-weight:700;color:#333;
+    border:1px solid #e0e0e0;border-bottom:none;}
+  .hp-bulk-badge{margin-left:auto;font-size:10.5px;padding:2px 10px;border-radius:999px;
+    font-weight:700;text-transform:uppercase;letter-spacing:.3px;background:#e0e0ea;color:#555;}
+  .hp-bulk-badge-found{background:rgba(16,185,129,.15);color:#0d9668;}
+  .hp-bulk-badge-notfound,.hp-bulk-badge-error{background:rgba(248,113,113,.15);color:#dc2626;}
+  .hp-bulk-item .hp-section{margin-bottom:0;border-radius:0;box-shadow:none;border:1px solid #e0e0e0;border-top:none;}
+  .hp-bulk-item .hp-not-found{border-radius:0;box-shadow:none;border:1px solid #e0e0e0;border-top:none;}
+  .hp-bulk-item .hp-section:last-child,.hp-bulk-item .hp-not-found{border-radius:0 0 10px 10px;}
 </style>
 
+<?php if ($isAdmin): ?>
+<div class="hp-tabs">
+  <button type="button" class="hp-tab active" id="hpTabSingle"><i class="bi bi-search"></i> Single Search</button>
+  <button type="button" class="hp-tab" id="hpTabBulk"><i class="bi bi-list-ol"></i> Bulk Search</button>
+</div>
+<?php endif; ?>
+
+<div id="hpSingleMode">
 <div class="hp-card">
   <div class="hp-card-body">
     <input type="text" id="hpNumberBox" placeholder="9876543210" maxlength="10"
@@ -94,6 +130,36 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <div class="hp-result-wrap" id="hpResultWrap"></div>
+</div>
+
+<?php if ($isAdmin): ?>
+<!-- Bulk Search (admin-only): sequential, one number at a time, over the
+     same hp_gas_api.php single-search endpoint - see the JS below for why
+     this isn't parallelized. -->
+<div id="hpBulkMode" style="display:none">
+  <div class="hp-card">
+    <div class="hp-card-body">
+      <textarea id="hpBulkNumbersBox" class="hp-textarea" placeholder="9876543210, 9876543211, ..."></textarea>
+      <div class="hp-row">
+        <button id="hpBulkSearchBtn" class="hp-btn">Bulk Search</button>
+        <button id="hpBulkClearBtn" class="hp-btn hp-btn-secondary" type="button">Clear</button>
+        <button id="hpBulkExportBtn" class="hp-btn hp-btn-secondary" type="button" disabled>
+          <i class="bi bi-file-earmark-excel"></i> Export CSV
+        </button>
+        <span id="hpBulkStatus"></span>
+      </div>
+      <div class="hp-progress-wrap" id="hpBulkProgressWrap">
+        <div class="hp-progress-track"><div class="hp-progress-fill determinate" id="hpBulkProgressFill"></div></div>
+        <div class="hp-progress-meta">
+          <span id="hpBulkProgressLabel"></span>
+          <span id="hpBulkProgressEta"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="hpBulkResultsWrap" style="margin-top:16px"></div>
+</div>
+<?php endif; ?>
 
 <script>
 const searchBtn      = document.getElementById("hpSearchBtn");
@@ -162,13 +228,18 @@ function updateQuotaBadge(used, limit) {
 // "Consumer Details", "Bank & LPG Linkage") - rendered as-is here rather
 // than assuming fixed field names, since whatever sections/fields
 // locateme.services shows for a given number is what gets displayed.
-function renderResult(data) {
-  resultWrap.innerHTML = "";
+// Takes a target container so Bulk Search (below) can render one of these
+// per number instead of duplicating this markup logic.
+function renderResultSections(container, data) {
+  container.innerHTML = "";
 
   if (!data.found) {
-    resultWrap.innerHTML = `<div class="hp-not-found">Not found for ${data.mobileNumber}.</div>`;
+    container.innerHTML = `<div class="hp-not-found">Not found for ${data.mobileNumber}.</div>`;
   } else if (Array.isArray(data.sections) && data.sections.length) {
-    data.sections.forEach(section => {
+    // "Bank & LPG Linkage" hidden from the UI per explicit instruction -
+    // still scraped/present in data.sections (hp_gas.py stays generic), just
+    // filtered out here rather than in the scraper.
+    data.sections.filter(section => !/bank/i.test(section.title)).forEach(section => {
       const box = document.createElement("div");
       box.className = "hp-section";
       const title = document.createElement("div");
@@ -188,7 +259,7 @@ function renderResult(data) {
       });
       table.appendChild(tbody);
       box.appendChild(table);
-      resultWrap.appendChild(box);
+      container.appendChild(box);
     });
   } else {
     // Fallback if locateme.services' DOM structure ever changes and
@@ -198,9 +269,12 @@ function renderResult(data) {
     box.innerHTML = `<div class="hp-section-title">Result for ${data.mobileNumber}</div>
       <div style="padding:16px;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;"></div>`;
     box.querySelector("div:last-child").textContent = data.rawText || "(no details captured)";
-    resultWrap.appendChild(box);
+    container.appendChild(box);
   }
+}
 
+function renderResult(data) {
+  renderResultSections(resultWrap, data);
   resultWrap.style.display = "block";
   if (data.found) startConfetti(); else stopConfetti();
   if (typeof data.used === "number" && typeof data.limit === "number") {
@@ -258,6 +332,211 @@ clearBtn.addEventListener("click", () => {
   stopProgress(null);
   stopConfetti();
 });
+
+// Bulk Search (admin-only) - the HTML for all of this only exists when
+// $isAdmin, so gate on the tab button's presence rather than a separate
+// PHP-emitted JS flag.
+const tabBulk = document.getElementById("hpTabBulk");
+if (tabBulk) {
+  const tabSingle       = document.getElementById("hpTabSingle");
+  const singleMode      = document.getElementById("hpSingleMode");
+  const bulkMode        = document.getElementById("hpBulkMode");
+  const bulkNumbersBox  = document.getElementById("hpBulkNumbersBox");
+  const bulkSearchBtn   = document.getElementById("hpBulkSearchBtn");
+  const bulkClearBtn    = document.getElementById("hpBulkClearBtn");
+  const bulkExportBtn   = document.getElementById("hpBulkExportBtn");
+  const bulkStatus      = document.getElementById("hpBulkStatus");
+  const bulkResultsWrap = document.getElementById("hpBulkResultsWrap");
+  const bulkProgressWrap  = document.getElementById("hpBulkProgressWrap");
+  const bulkProgressFill  = document.getElementById("hpBulkProgressFill");
+  const bulkProgressLabel = document.getElementById("hpBulkProgressLabel");
+  const bulkProgressEta   = document.getElementById("hpBulkProgressEta");
+
+  tabSingle.addEventListener("click", () => {
+    tabSingle.classList.add("active");
+    tabBulk.classList.remove("active");
+    singleMode.style.display = "";
+    bulkMode.style.display = "none";
+  });
+  tabBulk.addEventListener("click", () => {
+    tabBulk.classList.add("active");
+    tabSingle.classList.remove("active");
+    bulkMode.style.display = "";
+    singleMode.style.display = "none";
+  });
+
+  // ~25-90s per number (see ESTIMATED_SECONDS/hp_gas_api.php's 90s proxy
+  // timeout) - 50 keeps a full run under roughly an hour worst case rather
+  // than letting a pasted list run unbounded.
+  const BULK_LIMIT = 50;
+  let bulkResults = []; // [{ mobileNumber, found, sections, error }]
+
+  // Same number-parsing/merging as lpg_bulk_search.php's parseNumbers, minus
+  // the alternate-number-length tolerance HP Gas doesn't need (10-digit only).
+  function parseBulkNumbers(raw) {
+    const tokens = raw.split(/[\s,]+/).map(s => s.trim()).filter(s => s.length > 0);
+    const merged = [];
+    for (let i = 0; i < tokens.length; i++) {
+      const cur = tokens[i].replace(/\D+/g, "");
+      const next = tokens[i + 1] ? tokens[i + 1].replace(/\D+/g, "") : "";
+      if (cur.length === 5 && next.length === 5) {
+        merged.push(cur + next);
+        i++;
+      } else if (cur.length === 10) {
+        merged.push(cur);
+      }
+    }
+    return merged.slice(0, BULK_LIMIT);
+  }
+
+  function bulkBadge(state) {
+    if (state === "found") return '<span class="hp-bulk-badge hp-bulk-badge-found">Found</span>';
+    if (state === "notfound") return '<span class="hp-bulk-badge hp-bulk-badge-notfound">Not found</span>';
+    if (state === "error") return '<span class="hp-bulk-badge hp-bulk-badge-error">Error</span>';
+    return '<span class="hp-bulk-badge">Searching…</span>';
+  }
+
+  // Sequential, one number at a time - Gas/lpg_web/hp_gas.py drives a single
+  // Selenium session against the shared locateme.services login (same
+  // account rc_print.php uses), so firing these in parallel would mean
+  // multiple browser sessions racing over that one login instead of each
+  // waiting its turn.
+  async function runBulkSearch() {
+    const numbers = parseBulkNumbers(bulkNumbersBox.value);
+    if (numbers.length === 0) {
+      bulkStatus.textContent = "Enter at least one valid 10-digit mobile number.";
+      return;
+    }
+
+    bulkSearchBtn.disabled = true;
+    bulkExportBtn.disabled = true;
+    bulkResults = [];
+    bulkResultsWrap.innerHTML = "";
+    bulkProgressWrap.style.display = "block";
+    bulkProgressFill.style.width = "0%";
+    const startedAt = Date.now();
+
+    for (let i = 0; i < numbers.length; i++) {
+      const num = numbers[i];
+      bulkStatus.textContent = `Searching ${num}… (${i + 1}/${numbers.length})`;
+      bulkProgressLabel.textContent = `${i} / ${numbers.length} searched`;
+
+      const item = document.createElement("div");
+      item.className = "hp-bulk-item";
+      const header = document.createElement("div");
+      header.className = "hp-bulk-item-header";
+      header.innerHTML = `<span>${num}</span>${bulkBadge("searching")}`;
+      item.appendChild(header);
+      const sectionsBox = document.createElement("div");
+      item.appendChild(sectionsBox);
+      bulkResultsWrap.appendChild(item);
+
+      try {
+        const res = await fetch("hp_gas_api.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mobileNumber: num })
+        });
+        const data = await res.json();
+
+        if (res.status === 401) {
+          window.location.href = data.loginUrl || "login.php";
+          return;
+        }
+
+        if (!res.ok) {
+          header.innerHTML = `<span>${num}</span>${bulkBadge("error")}`;
+          sectionsBox.innerHTML = `<div class="hp-not-found">${data.error || "Search failed."}</div>`;
+          bulkResults.push({ mobileNumber: num, found: false, sections: [], error: data.error || "Search failed." });
+        } else {
+          header.innerHTML = `<span>${num}</span>${bulkBadge(data.found ? "found" : "notfound")}`;
+          renderResultSections(sectionsBox, data);
+          bulkResults.push({ mobileNumber: num, found: !!data.found, sections: data.sections || [] });
+        }
+      } catch (err) {
+        header.innerHTML = `<span>${num}</span>${bulkBadge("error")}`;
+        sectionsBox.innerHTML = `<div class="hp-not-found">Could not reach the server: ${err.message}</div>`;
+        bulkResults.push({ mobileNumber: num, found: false, sections: [], error: err.message });
+      }
+
+      const elapsed = (Date.now() - startedAt) / 1000;
+      const avgPerItem = elapsed / (i + 1);
+      bulkProgressFill.style.width = `${Math.round(((i + 1) / numbers.length) * 100)}%`;
+      bulkProgressLabel.textContent = `${i + 1} / ${numbers.length} searched`;
+      bulkProgressEta.textContent = i + 1 < numbers.length
+        ? `~${formatDuration(avgPerItem * (numbers.length - i - 1))} remaining`
+        : `Done in ${formatDuration(elapsed)}`;
+    }
+
+    bulkStatus.textContent = `Completed ${numbers.length} search${numbers.length === 1 ? "" : "es"}.`;
+    bulkSearchBtn.disabled = false;
+    bulkExportBtn.disabled = bulkResults.length === 0;
+    if (bulkResults.some(r => r.found)) startConfetti(); else stopConfetti();
+  }
+
+  function csvEscape(value) {
+    const s = (value ?? "").toString();
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }
+
+  // Columns are fully dynamic (whatever sections/fields locateme.services
+  // showed for each number - see renderResultSections) - built as the union
+  // of every "Section: Field" label seen, in first-seen order, so every row
+  // lines up even though not every number returns the same fields.
+  function exportBulkCsv() {
+    if (!bulkResults.length) return;
+    const columns = [];
+    const columnSet = new Set();
+    bulkResults.forEach(r => {
+      (r.sections || []).forEach(section => {
+        section.fields.forEach(field => {
+          const key = `${section.title}: ${field.label}`;
+          if (!columnSet.has(key)) { columnSet.add(key); columns.push(key); }
+        });
+      });
+    });
+
+    const headers = ["Mobile Number", "Status", ...columns];
+    const lines = [headers.join(",")];
+    bulkResults.forEach(r => {
+      const valueMap = {};
+      (r.sections || []).forEach(section => {
+        section.fields.forEach(field => {
+          valueMap[`${section.title}: ${field.label}`] = field.value || "";
+        });
+      });
+      const row = [
+        r.mobileNumber,
+        r.error ? "Error" : (r.found ? "Found" : "Not found"),
+        ...columns.map(c => valueMap[c] || "")
+      ];
+      lines.push(row.map(csvEscape).join(","));
+    });
+
+    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `hp_gas_bulk_search_${stamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  bulkSearchBtn.addEventListener("click", runBulkSearch);
+  bulkExportBtn.addEventListener("click", exportBulkCsv);
+  bulkClearBtn.addEventListener("click", () => {
+    bulkNumbersBox.value = "";
+    bulkStatus.textContent = "";
+    bulkResultsWrap.innerHTML = "";
+    bulkProgressWrap.style.display = "none";
+    bulkExportBtn.disabled = true;
+    bulkResults = [];
+    stopConfetti();
+  });
+}
 </script>
 
 <?php require __DIR__ . '/includes/footer.php'; ?>
