@@ -1,5 +1,9 @@
-# Copy this file to config.py and fill in the real SDMS login used by the
-# Selenium automation in lpg_search.py. Never commit the real file - it's
+# Copy this file to config.py and fill in the real values used by the
+# Selenium automations in this folder. Never commit the real file - it's
 # gitignored.
 USERNAME = "REPLACE_WITH_REAL_SDMS_USERNAME"
 PASSWORD = "REPLACE_WITH_REAL_SDMS_PASSWORD"
+
+# Used by rc_print.py (and hp_gas.py, which reuses rc_print.py's login).
+LOCATEME_EMAIL = "REPLACE_WITH_REAL_LOCATEME_EMAIL"
+LOCATEME_PASSWORD = "REPLACE_WITH_REAL_LOCATEME_PASSWORD"

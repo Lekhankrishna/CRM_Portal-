@@ -23,10 +23,17 @@
 /Gas/lpg_web/lpgtool.log
 /Gas/lpg_web/lpgtool_error.log
 
-# Real SDMS login for lpg_search.py's Selenium automation - see
-# Gas/lpg_web/config.py.example (found hardcoded directly in lpg_search.py
-# and already committed to git history 2026-08-07; moved out here).
+# Real SDMS + LOCATEME logins for lpg_search.py/rc_print.py's Selenium
+# automation - see Gas/lpg_web/config.py.example (found hardcoded directly
+# in those scripts and already committed to git history; moved out here).
 /Gas/lpg_web/config.py
+
+# Real logins for the Advance Pan India / Night Out / Advanced Search
+# vendor accounts - see config/vendor_credentials.php.example (found
+# hardcoded directly in includes/eagleeye_client.php,
+# includes/pan_india_pro_client.php, and includes/tracekart_client.php;
+# moved out here).
+/config/vendor_credentials.php
 
 # PAN India Telegram credentials and the local worker's whole runtime
 # directory (downloaded PHP loader/PHAR, QR-authorized session, logs) -
@@ -59,6 +66,11 @@ __pycache__/
 # Local service runtime logs (this machine's LPG web service), not source.
 /Gas/lpg_web/service.log
 /Gas/lpg_web/service_error.log
+
+# Admin > Agents create/edit PDOException details (admin/agents.php) - the
+# php.ini-configured error_log path isn't readable outside the web server's
+# own account, so this is logged here instead for debugging. Not source.
+/agents_debug.log
 
 # Stray editor/manual backup copies of tracked files.
 *.bak-*
