@@ -21,27 +21,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($user['expires_at'] !== null && strtotime($user['expires_at']) <= time()) {
             $error = 'This account has expired. Please contact an administrator.';
         } else {
+            // Each account gets up to max_concurrent_sessions active device
+            // slots (Admin > Agents > "Max Simultaneous Logins", default 1 -
+            // same as the old single-session behaviour). A login beyond that
+            // limit evicts the least-recently-used session rather than being
+            // refused - same "a new login always wins" spirit the old
+            // single-token version had, just extended past one slot instead
+            // of always kicking the only other session.
+            $maxSessions = max(1, (int) $user['max_concurrent_sessions']);
+            $countStmt = $pdo->prepare('SELECT COUNT(*) FROM user_sessions WHERE user_id = :id');
+            $countStmt->execute(['id' => $user['id']]);
+            $currentCount = (int) $countStmt->fetchColumn();
+            $toEvict = max(0, $currentCount - $maxSessions + 1);
+            if ($toEvict > 0) {
+                // $toEvict is derived from a COUNT(), not user input - safe to
+                // interpolate; PDO can't bind LIMIT as a parameter.
+                $pdo->prepare("DELETE FROM user_sessions WHERE user_id = :id ORDER BY last_seen_at ASC LIMIT {$toEvict}")
+                    ->execute(['id' => $user['id']]);
+            }
+
             $token = bin2hex(random_bytes(32));
-            $pdo->prepare('UPDATE users SET last_login_at = NOW() WHERE id = :id')
-                ->execute(['id' => $user['id']]);
             $pdo->prepare('INSERT INTO user_sessions (user_id, session_token) VALUES (:id, :token)')
                 ->execute(['id' => $user['id'], 'token' => $token]);
-
-            // Evict the oldest session(s) beyond this account's allowed
-            // concurrent-login count, keeping only the newest N (the one
-            // just created included) - this is what actually signs an
-            // over-the-limit device out, on ITS next request
-            // (isSessionValid() finds its token's row gone). Interpolated
-            // as a cast int, not bound, since MySQL's LIMIT is fussy about
-            // placeholders across PDO driver configs.
-            $maxSessions = max(1, (int) $user['max_concurrent_sessions']);
-            $pdo->prepare(
-                "DELETE FROM user_sessions WHERE user_id = :id AND id NOT IN (
-                    SELECT id FROM (
-                        SELECT id FROM user_sessions WHERE user_id = :id2 ORDER BY created_at DESC, id DESC LIMIT $maxSessions
-                    ) AS keep_ids
-                )"
-            )->execute(['id' => $user['id'], 'id2' => $user['id']]);
+            $pdo->prepare('UPDATE users SET last_login_at = NOW() WHERE id = :id')
+                ->execute(['id' => $user['id']]);
 
             session_regenerate_id(true);
             $_SESSION['user_id']       = $user['id'];
