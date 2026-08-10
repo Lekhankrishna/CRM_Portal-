@@ -73,8 +73,8 @@ require __DIR__ . '/includes/header.php';
   .hp-field-value{color:#222;font-weight:500;word-break:break-word;}
   .hp-not-found{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:16px;color:#f87171;font-weight:600;}
 
-  /* Bulk Search (admin-only, see $isAdmin below) - mode tabs match
-     advanced_search.php's .as-tabs/.as-tab exactly. */
+  /* Bulk Search - mode tabs match advanced_search.php's .as-tabs/.as-tab
+     exactly. */
   .hp-tabs{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
   .hp-tab{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:999px;
     border:1px solid #e2e2ea;background:#fff;font-size:12.5px;font-weight:600;color:#555;
@@ -102,12 +102,10 @@ require __DIR__ . '/includes/header.php';
   .hp-bulk-item .hp-section:last-child,.hp-bulk-item .hp-not-found{border-radius:0 0 10px 10px;}
 </style>
 
-<?php if ($isAdmin): ?>
 <div class="hp-tabs">
   <button type="button" class="hp-tab active" id="hpTabSingle"><i class="bi bi-search"></i> Single Search</button>
   <button type="button" class="hp-tab" id="hpTabBulk"><i class="bi bi-list-ol"></i> Bulk Search</button>
 </div>
-<?php endif; ?>
 
 <div id="hpSingleMode">
 <div class="hp-card">
@@ -132,10 +130,11 @@ require __DIR__ . '/includes/header.php';
 <div class="hp-result-wrap" id="hpResultWrap"></div>
 </div>
 
-<?php if ($isAdmin): ?>
-<!-- Bulk Search (admin-only): sequential, one number at a time, over the
-     same hp_gas_api.php single-search endpoint - see the JS below for why
-     this isn't parallelized. -->
+<!-- Bulk Search: sequential, one number at a time, over the same
+     hp_gas_api.php single-search endpoint - see the JS below for why this
+     isn't parallelized. Available to every agent (not admin-only), capped
+     lower than Single Search's per-search monthly limit would otherwise
+     allow in one batch - see BULK_LIMIT below. -->
 <div id="hpBulkMode" style="display:none">
   <div class="hp-card">
     <div class="hp-card-body">
@@ -159,7 +158,6 @@ require __DIR__ . '/includes/header.php';
   </div>
   <div id="hpBulkResultsWrap" style="margin-top:16px"></div>
 </div>
-<?php endif; ?>
 
 <script>
 const searchBtn      = document.getElementById("hpSearchBtn");
@@ -333,9 +331,8 @@ clearBtn.addEventListener("click", () => {
   stopConfetti();
 });
 
-// Bulk Search (admin-only) - the HTML for all of this only exists when
-// $isAdmin, so gate on the tab button's presence rather than a separate
-// PHP-emitted JS flag.
+// Bulk Search - available to every agent, not just admins (2026-08-11).
+const IS_ADMIN = <?= $isAdmin ? 'true' : 'false' ?>;
 const tabBulk = document.getElementById("hpTabBulk");
 if (tabBulk) {
   const tabSingle       = document.getElementById("hpTabSingle");
@@ -366,9 +363,12 @@ if (tabBulk) {
   });
 
   // ~25-90s per number (see ESTIMATED_SECONDS/hp_gas_api.php's 90s proxy
-  // timeout) - 50 keeps a full run under roughly an hour worst case rather
-  // than letting a pasted list run unbounded.
-  const BULK_LIMIT = 50;
+  // timeout) - 50 (admins) keeps a full run under roughly an hour worst case
+  // rather than letting a pasted list run unbounded. Agents are capped at 10
+  // per explicit instruction - each number still spends real locateme.services
+  // credits and counts against their own hp_gas_monthly_limit (enforced
+  // server-side per search in hp_gas_api.php), same as Single Search.
+  const BULK_LIMIT = IS_ADMIN ? 50 : 10;
   let bulkResults = []; // [{ mobileNumber, found, sections, error }]
 
   // Same number-parsing/merging as lpg_bulk_search.php's parseNumbers, minus
