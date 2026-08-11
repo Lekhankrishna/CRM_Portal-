@@ -151,11 +151,16 @@ $expiresLabel = $expiresAt ? date('d-F-Y', strtotime($expiresAt)) : null;
       <?php foreach ($searchRegionsExtra as $region):
         $isActive = $currentPage === basename($region['href']);
         $thisColorIndex = $navColorIndex++;
+        // Advanced Search's avatar is pinned dark per explicit instruction,
+        // rather than the auto-cycled palette every other item uses -
+        // $navColorIndex still increments normally so it doesn't shift any
+        // other item's color.
+        $avatarColor = $region['label'] === 'Advanced Search' ? '31,41,55' : sidebarNavColor($thisColorIndex);
       ?>
         <a href="<?= preg_match('#^https?://#', $region['href']) ? $region['href'] : $bp . $region['href'] ?>"
            class="sidebar__item<?= $isActive ? ' active' : '' ?>"
            <?= !empty($region['external']) ? 'target="_blank" rel="noopener noreferrer"' : '' ?>>
-          <span class="sidebar__avatar" style="background:rgb(<?= sidebarNavColor($thisColorIndex) ?>)"><?= strtoupper(substr($region['label'], 0, 1)) ?></span>
+          <span class="sidebar__avatar" style="background:rgb(<?= $avatarColor ?>)"><?= strtoupper(substr($region['label'], 0, 1)) ?></span>
           <?= htmlspecialchars($region['label']) ?>
           <?php if (!empty($region['external'])): ?>
             <i class="bi bi-box-arrow-up-right" style="margin-left:auto;font-size:11px;opacity:.6"></i>
