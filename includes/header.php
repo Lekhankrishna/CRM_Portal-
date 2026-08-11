@@ -161,7 +161,11 @@ $expiresLabel = $expiresAt ? date('d-F-Y', strtotime($expiresAt)) : null;
            class="sidebar__item<?= $isActive ? ' active' : '' ?>"
            <?= !empty($region['external']) ? 'target="_blank" rel="noopener noreferrer"' : '' ?>>
           <span class="sidebar__avatar" style="background:rgb(<?= $avatarColor ?>)"><?= strtoupper(substr($region['label'], 0, 1)) ?></span>
-          <?= htmlspecialchars($region['label']) ?>
+          <?php if ($region['label'] === 'Advanced Search'): ?>
+            <span style="font-weight:700"><?= htmlspecialchars($region['label']) ?></span>
+          <?php else: ?>
+            <?= htmlspecialchars($region['label']) ?>
+          <?php endif; ?>
           <?php if (!empty($region['external'])): ?>
             <i class="bi bi-box-arrow-up-right" style="margin-left:auto;font-size:11px;opacity:.6"></i>
           <?php endif; ?>
