@@ -145,23 +145,6 @@ require __DIR__ . '/includes/header.php';
     const weights = rawWeights.map(w => Math.min(w, cap));
     const totalWeight = weights.reduce((a, b) => a + b, 0);
 
-    // Curated highlighting (2026-08-04, matching a reference tool) - only a
-    // few "at a glance" fields get a solid colour fill (Alternate Number,
-    // Address, Aadhaar/ID-like fields); Phone/Mobile gets coloured HEADER
-    // TEXT only, no cell fill; everything else (name, father's name,
-    // operator, etc.) stays fully plain so the table doesn't compete with
-    // itself. Matched by field LABEL, so it still works for any dynamic
-    // label the bot sends, not a fixed column list.
-    function classifyColumn(label) {
-      if (/alternate/i.test(label)) { const c = [219, 39, 119]; return { headerColor: c, bodyColor: c }; }
-      if (/address/i.test(label))   { const c = [5, 150, 105];  return { headerColor: c, bodyColor: c }; }
-      if (/aadhaar|passport|identity/i.test(label)) { const c = [37, 99, 235]; return { headerColor: c, bodyColor: c }; }
-      if (/^phone|mobile/i.test(label)) return { headerColor: [217, 119, 6], bodyColor: null };
-      return { headerColor: null, bodyColor: null };
-    }
-    const colClasses = columns.map(classifyColumn);
-    if (showMediaColumn) colClasses.push({ headerColor: null, bodyColor: null });
-
     const table = document.createElement('table');
     table.className = 'results-table pan-results-table';
 
@@ -175,17 +158,14 @@ require __DIR__ . '/includes/header.php';
 
     const thead = document.createElement('thead');
     const headRow = document.createElement('tr');
-    columns.forEach((col, i) => {
+    columns.forEach(col => {
       const th = document.createElement('th');
       th.textContent = col;
-      const hc = colClasses[i].headerColor;
-      th.style.color = hc ? `rgb(${hc[0]},${hc[1]},${hc[2]})` : '#fff';
       headRow.appendChild(th);
     });
     if (showMediaColumn) {
       const th = document.createElement('th');
       th.textContent = 'Attachment';
-      th.style.color = '#fff';
       headRow.appendChild(th);
     }
     thead.appendChild(headRow);
@@ -193,13 +173,8 @@ require __DIR__ . '/includes/header.php';
     const tbody = document.createElement('tbody');
     parsed.forEach(r => {
       const tr = document.createElement('tr');
-      columns.forEach((col, i) => {
+      columns.forEach(col => {
         const td = document.createElement('td');
-        const bc = colClasses[i].bodyColor;
-        if (bc) {
-          td.style.background = `rgb(${bc[0]},${bc[1]},${bc[2]})`;
-          td.style.color = '#fff';
-        }
         let value = r.fields.get(col) || '—';
         // Semicolons show up two ways: multiple values this code joined
         // itself (now ", " - see parseFields), and ones already baked into
