@@ -360,6 +360,17 @@ def _search_one_number(driver, wait, mobile_input, mobile_number):
 
     relationship_id = _read_form_field(driver, "input", "Relationship Id")
 
+    # The Contact Form's own single "Address" textarea (Consumer Detail panel,
+    # aria-label="Address" - confirmed 2026-08-16 from live element
+    # inspection) already holds one clean, fully-formatted multi-line
+    # address, rather than the 7 separate grid cells above having to be
+    # reassembled - preferred over the grid-based address whenever the
+    # drilldown succeeded and this field actually has a value; the grid
+    # version stays as the fallback for the case this form field is blank.
+    contact_form_address = _read_form_field(driver, "textarea", "Address")
+    if contact_form_address:
+        address = contact_form_address
+
     country = _read_form_field_by_labelledby_contains(driver, "input", "Personal_Country_Label")
     pin_code = _read_form_field_by_labelledby_contains(driver, "input", "Personal_Postal_Code_Label")
     urban_rural = _read_form_field_by_labelledby_contains(driver, "input", "EPIC_Urban_Rural_Label")
