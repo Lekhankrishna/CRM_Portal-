@@ -82,6 +82,28 @@ function requireLpgSearchAccess(string $loginPath = 'login.php'): void {
 
 // Same pattern as hasLpgSearchAccess() - checked fresh from the DB every
 // request so a revoke from Admin > Agents takes effect immediately. Defaults
+// to NOT granted (see migrate_add_locate_me_access.sql).
+function hasLocateMeAccess(): bool {
+    global $pdo;
+    if (!isLoggedIn()) return false;
+    static $access = null;
+    if ($access !== null) return $access;
+    $stmt = $pdo->prepare('SELECT locate_me_access FROM users WHERE id = :id');
+    $stmt->execute(['id' => $_SESSION['user_id']]);
+    $access = (bool) $stmt->fetchColumn();
+    return $access;
+}
+
+function requireLocateMeAccess(string $loginPath = 'login.php'): void {
+    requireLogin($loginPath);
+    if (!hasLocateMeAccess()) {
+        http_response_code(403);
+        die('Access denied: Locate Me access has not been granted for this account.');
+    }
+}
+
+// Same pattern as hasLpgSearchAccess() - checked fresh from the DB every
+// request so a revoke from Admin > Agents takes effect immediately. Defaults
 // to NOT granted (see migrate_add_rc_print_access.sql).
 function hasRcPrintAccess(): bool {
     global $pdo;

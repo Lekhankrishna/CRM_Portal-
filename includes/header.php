@@ -27,6 +27,18 @@ $searchRegionsExtra = [
 if (hasAdvancedSearchAccess()) {
     array_unshift($searchRegionsExtra, ['label' => 'Advanced Search', 'href' => 'advanced_search.php']);
 }
+// Locate Me is opt-in per account (Admin > Agents > "Locate Me Access") -
+// embeds locateme.services' own dashboard (26+ OSINT tools) directly in an
+// iframe inside the CRM's layout, rather than one automated single-purpose
+// page per tool like RC Print/HP Gas below. Placed directly under Advanced
+// Search per explicit instruction - inserted at index 1 so it lands right
+// after Advanced Search regardless of whether Advanced Search itself was
+// unshifted above (index 0) or this account doesn't have that access
+// (in which case it simply becomes the new first item).
+if (hasLocateMeAccess()) {
+    $locateMeIndex = hasAdvancedSearchAccess() ? 1 : 0;
+    array_splice($searchRegionsExtra, $locateMeIndex, 0, [['label' => 'Locate Me', 'href' => 'locate_me.php']]);
+}
 // RC Print is opt-in per account (Admin > Agents > "RC Print Access") - same
 // pattern as LPG Search below. rc_print.php fetches a vehicle's RC PDF
 // server-side via rc_print_api.php -> Gas/lpg_web's /api/rc-print (Selenium,
