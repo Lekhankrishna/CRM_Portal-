@@ -77,20 +77,29 @@ require __DIR__ . '/includes/header.php';
   .lm-field-label{width:38%;color:#777;font-weight:600;}
   .lm-field-value{color:#222;font-weight:500;word-break:break-word;}
   .lm-not-found{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:16px;color:#f87171;font-weight:600;}
-  .lm-tool-select{width:100%;padding:11px 16px;font-size:13px;color:#333;border:1px solid #e0e0e0;
-    border-radius:9px;background:#fff;outline:none;margin-bottom:10px;cursor:pointer;}
-  .lm-tool-select:focus{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.15);}
+  /* Tool picker - same tab-pill look as advanced_search.php's .as-tabs/.as-tab,
+     just renamed with this page's own lm- prefix. Wraps onto multiple lines
+     for Locate Me's 24 tools instead of advanced_search.php's 5 modes, same
+     as that page's row already supports via flex-wrap. */
+  .lm-tabs{display:flex;gap:10px;flex-wrap:wrap;padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid #eee;}
+  .lm-tab{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:10px;
+    border:1px solid #e2e2ea;background:#fff;font-size:12.5px;font-weight:600;color:#555;
+    cursor:pointer;transition:all 150ms;white-space:nowrap;}
+  .lm-tab:hover{border-color:#4f46e5;color:#4f46e5;}
+  .lm-tab.active{background:#4f46e5;border-color:#4f46e5;color:#fff;box-shadow:0 4px 14px rgba(79,70,229,.35);}
 </style>
 
 <div class="lm-card">
   <div class="lm-card-body">
     <p class="lm-hint">Pick a tool, then enter the matching value to search locateme.services' database.</p>
-    <select id="lmToolSelect" class="lm-tool-select">
+    <div class="lm-tabs" id="lmToolTabs" role="tablist">
       <?php foreach (LOCATEME_TOOLS as $slug => $tool): ?>
-        <option value="<?= htmlspecialchars($slug) ?>" data-placeholder="<?= htmlspecialchars($tool['placeholder']) ?>"
-                <?= $slug === 'mobile-info' ? 'selected' : '' ?>><?= htmlspecialchars($tool['label']) ?></option>
+        <button type="button" class="lm-tab<?= $slug === 'mobile-info' ? ' active' : '' ?>"
+                data-tool="<?= htmlspecialchars($slug) ?>" data-placeholder="<?= htmlspecialchars($tool['placeholder']) ?>">
+          <?= htmlspecialchars($tool['label']) ?>
+        </button>
       <?php endforeach; ?>
-    </select>
+    </div>
     <input type="text" id="lmQueryBox" placeholder="Enter Mobile Number" maxlength="100"
            style="width:100%;padding:11px 16px;font-size:13px;color:#333;border:1px solid #e0e0e0;border-radius:9px;background:#fff;outline:none;">
     <div class="lm-row">
@@ -113,7 +122,7 @@ require __DIR__ . '/includes/header.php';
 <script>
 const searchBtn      = document.getElementById("lmSearchBtn");
 const clearBtn       = document.getElementById("lmClearBtn");
-const toolSelect     = document.getElementById("lmToolSelect");
+const toolTabs       = document.getElementById("lmToolTabs");
 const queryBox       = document.getElementById("lmQueryBox");
 const statusEl       = document.getElementById("lmStatus");
 const resultWrap     = document.getElementById("lmResultWrap");
@@ -132,16 +141,19 @@ function formatDuration(seconds) {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
+// Tab picker - same active-tab pattern as advanced_search.php's .as-tabs.
 // Placeholder swaps to match whatever the selected tool actually expects
 // (mobile number, Aadhaar number, vehicle number, email, IFSC code, ...) -
 // see includes/locateme_tools.php for the full list, mirrored server-side
 // in Gas/lpg_web/locate_tools.py's TOOL_REGISTRY.
-function updatePlaceholder() {
-  const opt = toolSelect.options[toolSelect.selectedIndex];
-  queryBox.placeholder = opt ? opt.dataset.placeholder : "";
-}
-toolSelect.addEventListener("change", updatePlaceholder);
-updatePlaceholder();
+let activeTool = "mobile-info";
+toolTabs.querySelectorAll(".lm-tab").forEach(tab => tab.addEventListener("click", () => {
+  toolTabs.querySelectorAll(".lm-tab").forEach(t => t.classList.remove("active"));
+  tab.classList.add("active");
+  activeTool = tab.dataset.tool;
+  queryBox.placeholder = tab.dataset.placeholder;
+  statusEl.textContent = "";
+}));
 
 // There's no per-step progress to report here (unlike LPG's job-based
 // polling) - this is one blocking fetch for the whole login+search+scrape
@@ -245,7 +257,7 @@ function renderResult(data) {
 }
 
 async function runSearch() {
-  const tool = toolSelect.value;
+  const tool = activeTool;
   const query = queryBox.value.trim();
   if (!query) {
     statusEl.textContent = "Enter a value to search.";
