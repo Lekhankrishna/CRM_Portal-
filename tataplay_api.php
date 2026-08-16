@@ -112,6 +112,7 @@ if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decode
             $decoded['subscriberId'] ?? '',
             $decoded['accountStatus'] ?? '',
             $decoded['address'] ?? '',
+            $decoded['lastRechargeDate'] ?? '',
             currentUser()['username'] ?? 'unknown',
             $mobileNumber
         );

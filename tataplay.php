@@ -194,6 +194,7 @@ function renderResult(data) {
       ["Subscriber Id", data.subscriberId],
       ["Account Status", data.accountStatus],
       ["Address", data.address],
+      ["Last Recharge Date", data.lastRechargeDate],
     ];
     rows.forEach(([label, value]) => {
       const tr = document.createElement("tr");
