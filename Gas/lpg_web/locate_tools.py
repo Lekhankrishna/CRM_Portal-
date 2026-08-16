@@ -62,13 +62,25 @@ NAME_XPATH = ".//div[contains(@class,'text-2xl') and contains(@class,'font-black
 BADGE_XPATH = ".//div[contains(@class,'inline-flex') and contains(@class,'rounded-full') and contains(@class,'border') and contains(@class,'text-xs')]"
 FIELD_LABEL_XPATH = ".//p[contains(@class,'text-[10px]') and contains(@class,'tracking-widest')]"
 
+# Second layout, confirmed 2026-08-17 on UPI Finder (and already proven on
+# HP Gas Advanced, see hp_gas.py) - a "profile card" tool like Mobile Info
+# isn't the only shape this site uses. A "lookup/verification" tool instead
+# renders repeating section headers ("Holder Details", "Verification &
+# Status") each followed by a grid of small field cards
+# (<div class="p-3 bg-muted/30 rounded-lg ..."> holding exactly two <p>
+# tags: label, then value). Tried after CARD_XPATH comes up empty, and
+# mapped into the same {name, status, fields} record shape (name = section
+# title, status = "") so the frontend doesn't need two rendering paths.
+SECTION_HEADER_XPATH = "//h3[contains(@class,'tracking-[0.2em]')]"
+FIELD_CARD_XPATH = "//div[contains(@class,'bg-muted/30') and contains(@class,'rounded-lg') and contains(@class,'p-3')]"
+
 FAILURE_NEEDLES = (
     "not found", "no record", "no results", "no matching", "no data found",
     "invalid", "insufficient credit", "error occurred", "something went wrong",
 )
 
 
-def _extract_records(driver):
+def _extract_person_cards(driver):
     cards = driver.find_elements(By.XPATH, CARD_XPATH)
     records = []
     for card in cards:
@@ -91,6 +103,51 @@ def _extract_records(driver):
             records.append({"name": name, "status": status, "fields": fields})
 
     return records
+
+
+def _extract_sections(driver):
+    nodes = driver.find_elements(By.XPATH, f"{SECTION_HEADER_XPATH} | {FIELD_CARD_XPATH}")
+
+    sections = []
+    current = None
+    for el in nodes:
+        if el.tag_name == "h3":
+            current = {"name": el.text.strip(), "status": "", "fields": []}
+            sections.append(current)
+            continue
+        if current is None:
+            continue
+        ps = el.find_elements(By.TAG_NAME, "p")
+        if len(ps) < 2:
+            continue
+        label = ps[0].text.strip()
+        value = ps[-1].text.strip()
+        if label:
+            current["fields"].append({"label": label, "value": value})
+
+    return [s for s in sections if s["fields"]]
+
+
+def _extract_records(driver):
+    records = _extract_person_cards(driver)
+    if records:
+        return records
+    return _extract_sections(driver)
+
+
+def _main_text(driver):
+    """
+    The page layout nests two <main> elements (an outer shell, an inner
+    page-specific one - confirmed 2026-08-17) - the innermost one holds only
+    the actual tool's own content, excluding the sidebar (Dashboard/History/
+    Settings/Credits/account email) and topbar that a plain <body> capture
+    would otherwise drag in. Falls back to <body> if that structure ever
+    changes rather than raising.
+    """
+    mains = driver.find_elements(By.TAG_NAME, "main")
+    if mains:
+        return mains[-1].text
+    return driver.find_element(By.TAG_NAME, "body").text
 
 
 def run_tool_search(tool_slug, query):
@@ -127,8 +184,8 @@ def run_tool_search(tool_slug, query):
 
         deadline = time.time() + 30
         while time.time() < deadline:
-            body_text = driver.find_element(By.TAG_NAME, "body").text
-            lower = body_text.lower()
+            page_text = _main_text(driver)
+            lower = page_text.lower()
 
             for needle in FAILURE_NEEDLES:
                 if needle in lower:
@@ -140,12 +197,13 @@ def run_tool_search(tool_slug, query):
 
             time.sleep(1)
 
-        # Timed out without a clear card result or failure needle - capture
-        # whatever's on screen rather than silently reporting nothing (e.g.
-        # a tool whose result layout doesn't match CARD_XPATH at all, like
-        # WhatsApp DP Downloader's image output - see module docstring).
-        final_text = driver.find_element(By.TAG_NAME, "body").text
-        return {"toolSlug": tool_slug, "query": query, "found": True, "rawText": final_text}
+        # Timed out without a clear card/section result or failure needle -
+        # capture whatever's in the page's own <main> (excludes the
+        # sidebar/topbar chrome - see _main_text()) rather than silently
+        # reporting nothing (e.g. a tool whose result layout matches neither
+        # extractor, like WhatsApp DP Downloader's image output - see module
+        # docstring).
+        return {"toolSlug": tool_slug, "query": query, "found": True, "rawText": _main_text(driver)}
 
     finally:
         if driver is not None:
