@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $role      = ($_POST['role'] ?? 'agent') === 'admin' ? 'admin' : 'agent';
         $lpgAccess = isset($_POST['lpg_search_access']) ? 1 : 0;
         $locateMeAccess = isset($_POST['locate_me_access']) ? 1 : 0;
+        $locateMeMonthlyLimit = min(65535, max(0, (int) ($_POST['locate_me_monthly_limit'] ?? 5)));
         $rcPrintAccess = isset($_POST['rc_print_access']) ? 1 : 0;
         $rcPrintMonthlyLimit = min(65535, max(0, (int) ($_POST['rc_print_monthly_limit'] ?? 5)));
         $hpGasAccess = isset($_POST['hp_gas_access']) ? 1 : 0;
@@ -40,8 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'danger';
         } else {
             $stmt = $pdo->prepare(
-                'INSERT INTO users (username, password_hash, full_name, mobile_no, role, lpg_search_access, locate_me_access, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, tata_play_access, tata_play_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, max_concurrent_sessions, expires_at)
-                 VALUES (:username, :hash, :full_name, :mobile_no, :role, :lpg_access, :locate_me_access, :rc_print_access, :rc_print_monthly_limit, :hp_gas_access, :hp_gas_monthly_limit, :tata_play_access, :tata_play_monthly_limit, :eagle_eye_access, :eagle_eye_monthly_limit, :pan_india_access, :pan_india_pro_access, :pan_india_pro_monthly_limit, :advanced_search_access, :advanced_search_monthly_limit, :max_sessions, :expires_at)'
+                'INSERT INTO users (username, password_hash, full_name, mobile_no, role, lpg_search_access, locate_me_access, locate_me_monthly_limit, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, tata_play_access, tata_play_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, max_concurrent_sessions, expires_at)
+                 VALUES (:username, :hash, :full_name, :mobile_no, :role, :lpg_access, :locate_me_access, :locate_me_monthly_limit, :rc_print_access, :rc_print_monthly_limit, :hp_gas_access, :hp_gas_monthly_limit, :tata_play_access, :tata_play_monthly_limit, :eagle_eye_access, :eagle_eye_monthly_limit, :pan_india_access, :pan_india_pro_access, :pan_india_pro_monthly_limit, :advanced_search_access, :advanced_search_monthly_limit, :max_sessions, :expires_at)'
             );
             try {
                 $stmt->execute([
@@ -52,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'role'      => $role,
                     'lpg_access'=> $lpgAccess,
                     'locate_me_access' => $locateMeAccess,
+                    'locate_me_monthly_limit' => $locateMeMonthlyLimit,
                     'rc_print_access' => $rcPrintAccess,
                     'rc_print_monthly_limit' => $rcPrintMonthlyLimit,
                     'hp_gas_access' => $hpGasAccess,
@@ -89,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $role     = ($_POST['role'] ?? 'agent') === 'admin' ? 'admin' : 'agent';
         $lpgAccess = isset($_POST['lpg_search_access']) ? 1 : 0;
         $locateMeAccess = isset($_POST['locate_me_access']) ? 1 : 0;
+        $locateMeMonthlyLimit = min(65535, max(0, (int) ($_POST['locate_me_monthly_limit'] ?? 5)));
         $rcPrintAccess = isset($_POST['rc_print_access']) ? 1 : 0;
         $rcPrintMonthlyLimit = min(65535, max(0, (int) ($_POST['rc_print_monthly_limit'] ?? 5)));
         $hpGasAccess = isset($_POST['hp_gas_access']) ? 1 : 0;
@@ -115,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message     = 'New password must be at least 6 characters (or leave it blank to keep the current one).';
             $messageType = 'danger';
         } else {
-            $sql = 'UPDATE users SET username = :username, full_name = :full_name, mobile_no = :mobile_no, role = :role, lpg_search_access = :lpg_access, locate_me_access = :locate_me_access, rc_print_access = :rc_print_access, rc_print_monthly_limit = :rc_print_monthly_limit, hp_gas_access = :hp_gas_access, hp_gas_monthly_limit = :hp_gas_monthly_limit, tata_play_access = :tata_play_access, tata_play_monthly_limit = :tata_play_monthly_limit, eagle_eye_access = :eagle_eye_access, eagle_eye_monthly_limit = :eagle_eye_monthly_limit, pan_india_access = :pan_india_access, pan_india_pro_access = :pan_india_pro_access, pan_india_pro_monthly_limit = :pan_india_pro_monthly_limit, advanced_search_access = :advanced_search_access, advanced_search_monthly_limit = :advanced_search_monthly_limit, max_concurrent_sessions = :max_sessions, expires_at = :expires_at';
+            $sql = 'UPDATE users SET username = :username, full_name = :full_name, mobile_no = :mobile_no, role = :role, lpg_search_access = :lpg_access, locate_me_access = :locate_me_access, locate_me_monthly_limit = :locate_me_monthly_limit, rc_print_access = :rc_print_access, rc_print_monthly_limit = :rc_print_monthly_limit, hp_gas_access = :hp_gas_access, hp_gas_monthly_limit = :hp_gas_monthly_limit, tata_play_access = :tata_play_access, tata_play_monthly_limit = :tata_play_monthly_limit, eagle_eye_access = :eagle_eye_access, eagle_eye_monthly_limit = :eagle_eye_monthly_limit, pan_india_access = :pan_india_access, pan_india_pro_access = :pan_india_pro_access, pan_india_pro_monthly_limit = :pan_india_pro_monthly_limit, advanced_search_access = :advanced_search_access, advanced_search_monthly_limit = :advanced_search_monthly_limit, max_concurrent_sessions = :max_sessions, expires_at = :expires_at';
             $params = [
                 'username'  => $username,
                 'full_name' => $fullName,
@@ -123,6 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'role'      => $role,
                 'lpg_access'=> $lpgAccess,
                 'locate_me_access' => $locateMeAccess,
+                'locate_me_monthly_limit' => $locateMeMonthlyLimit,
                 'rc_print_access' => $rcPrintAccess,
                 'rc_print_monthly_limit' => $rcPrintMonthlyLimit,
                 'hp_gas_access' => $hpGasAccess,
@@ -232,7 +236,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $users = $pdo->query(
-    'SELECT id, username, full_name, mobile_no, role, is_active, lpg_search_access, lpg_bookmarklet_key, locate_me_access, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, tata_play_access, tata_play_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, max_concurrent_sessions, expires_at, created_at, last_login_at FROM users ORDER BY created_at DESC'
+    'SELECT id, username, full_name, mobile_no, role, is_active, lpg_search_access, lpg_bookmarklet_key, locate_me_access, locate_me_monthly_limit, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, tata_play_access, tata_play_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, max_concurrent_sessions, expires_at, created_at, last_login_at FROM users ORDER BY created_at DESC'
 )->fetchAll();
 
 // Summary stats for the admin view. "Logged In" counts users who have ever
@@ -389,6 +393,9 @@ require __DIR__ . '/../includes/header.php';
       <label class="acf-feature">
         <input type="checkbox" name="locate_me_access" value="1">
         <span>Locate Me</span>
+        <span class="acf-limit" title="How many Locate Me searches this agent can run per calendar month - each one spends real credits (100/search) on the shared locateme.services account. Ignored for admins.">
+          <input type="number" name="locate_me_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
+        </span>
       </label>
       <label class="acf-feature">
         <input type="checkbox" name="pan_india_access" value="1">
@@ -528,6 +535,9 @@ require __DIR__ . '/../includes/header.php';
             <span class="badge <?= $u['locate_me_access'] ? 'badge-success' : 'badge-neutral' ?>">
               <?= $u['locate_me_access'] ? 'Granted' : 'Not Granted' ?>
             </span>
+            <?php if ($u['locate_me_access'] && $u['role'] !== 'admin'): ?>
+              <div class="text-sm text-muted" style="margin-top:2px"><?= (int) $u['locate_me_monthly_limit'] ?>/month</div>
+            <?php endif; ?>
           </td>
           <td>
             <span class="badge <?= $u['pan_india_access'] ? 'badge-success' : 'badge-neutral' ?>">
@@ -604,7 +614,7 @@ require __DIR__ . '/../includes/header.php';
           </td>
           <td class="action-cell">
             <button type="button" class="btn btn-sm btn-secondary"
-                    onclick="openEditModal(<?= (int) $u['id'] ?>, <?= htmlspecialchars(json_encode($u['username']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['full_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['mobile_no'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['role']), ENT_QUOTES) ?>, <?= (int) $u['lpg_search_access'] ?>, <?= (int) $u['locate_me_access'] ?>, <?= (int) $u['rc_print_access'] ?>, <?= (int) $u['rc_print_monthly_limit'] ?>, <?= (int) $u['hp_gas_access'] ?>, <?= (int) $u['hp_gas_monthly_limit'] ?>, <?= (int) $u['tata_play_access'] ?>, <?= (int) $u['tata_play_monthly_limit'] ?>, <?= (int) $u['eagle_eye_access'] ?>, <?= (int) $u['eagle_eye_monthly_limit'] ?>, <?= (int) $u['pan_india_access'] ?>, <?= (int) $u['pan_india_pro_access'] ?>, <?= (int) $u['pan_india_pro_monthly_limit'] ?>, <?= (int) $u['advanced_search_access'] ?>, <?= (int) $u['advanced_search_monthly_limit'] ?>, <?= (int) $u['max_concurrent_sessions'] ?>, <?= htmlspecialchars(json_encode($expiryDateValue), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($expiryTimeValue), ENT_QUOTES) ?>)">
+                    onclick="openEditModal(<?= (int) $u['id'] ?>, <?= htmlspecialchars(json_encode($u['username']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['full_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['mobile_no'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['role']), ENT_QUOTES) ?>, <?= (int) $u['lpg_search_access'] ?>, <?= (int) $u['locate_me_access'] ?>, <?= (int) $u['locate_me_monthly_limit'] ?>, <?= (int) $u['rc_print_access'] ?>, <?= (int) $u['rc_print_monthly_limit'] ?>, <?= (int) $u['hp_gas_access'] ?>, <?= (int) $u['hp_gas_monthly_limit'] ?>, <?= (int) $u['tata_play_access'] ?>, <?= (int) $u['tata_play_monthly_limit'] ?>, <?= (int) $u['eagle_eye_access'] ?>, <?= (int) $u['eagle_eye_monthly_limit'] ?>, <?= (int) $u['pan_india_access'] ?>, <?= (int) $u['pan_india_pro_access'] ?>, <?= (int) $u['pan_india_pro_monthly_limit'] ?>, <?= (int) $u['advanced_search_access'] ?>, <?= (int) $u['advanced_search_monthly_limit'] ?>, <?= (int) $u['max_concurrent_sessions'] ?>, <?= htmlspecialchars(json_encode($expiryDateValue), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($expiryTimeValue), ENT_QUOTES) ?>)">
               <i class="bi bi-pencil-square"></i> Edit
             </button>
             <?php if ($u['lpg_search_access'] && $u['lpg_bookmarklet_key']): ?>
@@ -678,6 +688,9 @@ require __DIR__ . '/../includes/header.php';
           <label class="acf-feature">
             <input type="checkbox" name="locate_me_access" id="edit-locate_me_access" value="1">
             <span>Locate Me</span>
+            <span class="acf-limit" title="How many Locate Me searches this agent can run per calendar month - each one spends real credits (100/search) on the shared locateme.services account. Ignored for admins.">
+              <input type="number" name="locate_me_monthly_limit" id="edit-locate_me_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
+            </span>
           </label>
           <label class="acf-feature">
             <input type="checkbox" name="pan_india_access" id="edit-pan_india_access" value="1">
@@ -766,7 +779,7 @@ require __DIR__ . '/../includes/header.php';
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
-function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, locateMeAccess, rcPrintAccess, rcPrintMonthlyLimit, hpGasAccess, hpGasMonthlyLimit, tataPlayAccess, tataPlayMonthlyLimit, eagleEyeAccess, eagleEyeMonthlyLimit, panIndiaAccess, panIndiaProAccess, panIndiaProMonthlyLimit, advancedSearchAccess, advancedSearchMonthlyLimit, maxSessions, expiresDate, expiresTime) {
+function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, locateMeAccess, locateMeMonthlyLimit, rcPrintAccess, rcPrintMonthlyLimit, hpGasAccess, hpGasMonthlyLimit, tataPlayAccess, tataPlayMonthlyLimit, eagleEyeAccess, eagleEyeMonthlyLimit, panIndiaAccess, panIndiaProAccess, panIndiaProMonthlyLimit, advancedSearchAccess, advancedSearchMonthlyLimit, maxSessions, expiresDate, expiresTime) {
   document.getElementById('edit-id').value = id;
   document.getElementById('edit-username').value = username;
   document.getElementById('edit-full_name').value = fullName;
@@ -774,6 +787,7 @@ function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, locate
   document.getElementById('edit-role').value = role;
   document.getElementById('edit-lpg_search_access').checked = !!lpgAccess;
   document.getElementById('edit-locate_me_access').checked = !!locateMeAccess;
+  document.getElementById('edit-locate_me_monthly_limit').value = locateMeMonthlyLimit;
   document.getElementById('edit-rc_print_access').checked = !!rcPrintAccess;
   document.getElementById('edit-rc_print_monthly_limit').value = rcPrintMonthlyLimit;
   document.getElementById('edit-hp_gas_access').checked = !!hpGasAccess;
@@ -902,7 +916,7 @@ const AGENTS_EXPORT_DATA = <?= json_encode(array_map(function ($u) {
         'role' => ucfirst($u['role']),
         'status' => $isExpired ? 'Expired' : ($u['is_active'] ? 'Active' : 'Paused'),
         'lpg' => $u['lpg_search_access'] ? 'Granted' : 'Not Granted',
-        'locate_me' => $u['locate_me_access'] ? 'Granted' : 'Not Granted',
+        'locate_me' => $u['locate_me_access'] ? "Granted ({$u['locate_me_monthly_limit']}/mo)" : 'Not Granted',
         'pan_india' => $u['pan_india_access'] ? 'Granted' : 'Not Granted',
         'rc_print' => $u['rc_print_access'] ? "Granted ({$u['rc_print_monthly_limit']}/mo)" : 'Not Granted',
         'hp_gas' => $u['hp_gas_access'] ? "Granted ({$u['hp_gas_monthly_limit']}/mo)" : 'Not Granted',
