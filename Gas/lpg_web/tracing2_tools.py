@@ -79,10 +79,26 @@ NAME_XPATH = ".//div[contains(@class,'text-2xl') and contains(@class,'font-black
 BADGE_XPATH = ".//div[contains(@class,'inline-flex') and contains(@class,'rounded-full') and contains(@class,'border') and contains(@class,'text-xs')]"
 
 # The universal field-pair shape (see module docstring): any element with
-# exactly two direct <p> children. ./p (not .//p) matters - it must be
-# DIRECT children, so this doesn't also match an ancestor further up that
-# happens to contain more than two <p> descendants overall.
-FIELD_PAIR_XPATH = ".//*[count(./p) = 2]"
+# exactly two <p> DESCENDANTS (.//p, not just direct children ./p - widened
+# 2026-08-17 after a live Aadhaar to Ration search returned zero records
+# despite genuine data being present: that page's "Registry Meta" field
+# cards put the label <p> one level deeper, inside an icon-wrapper <div>,
+# while the value <p> is a direct child - "exactly two DIRECT <p> children"
+# matched neither, so a field card that HAD 2 total <p>s just silently
+# vanished.
+#
+# "and not(.//*[count(.//p)=2])" excludes any match that itself CONTAINS
+# another match - without this, a field whose 2-<p> container is wrapped in
+# one more layer (Mobile Info/UPI Finder's own "<div class='flex ... gap-3'>
+# <svg/><div><p>label</p><p>value</p></div></div>" icon wrapper) matches
+# TWICE: once as the inner <div> (2 direct <p>s) and once as its own outer
+# wrapper (still exactly 2 <p> descendants, just one level further out) -
+# confirmed 2026-08-17 as a regression this same day's earlier fix
+# introduced, doubling every field on both of those tools. This keeps only
+# the innermost (most specific) matching container per field, which still
+# correctly matches Registry Meta's single-level card (nothing beneath it
+# also satisfies count(.//p)=2, so the negation is trivially true there).
+FIELD_PAIR_XPATH = ".//*[count(.//p) = 2 and not(.//*[count(.//p) = 2])]"
 
 FAILURE_NEEDLES = (
     "not found", "no record", "no results", "no matching", "no data found",
@@ -115,7 +131,7 @@ def _is_loading_placeholder(value):
 def _field_pairs_within(root):
     fields = []
     for el in root.find_elements(By.XPATH, FIELD_PAIR_XPATH):
-        ps = el.find_elements(By.XPATH, "./p")
+        ps = el.find_elements(By.XPATH, ".//p")
         label = ps[0].text.strip()
         value = ps[1].text.strip()
         if label and not _is_loading_placeholder(value):
@@ -156,7 +172,7 @@ def _extract_sections(root):
             continue
         if current is None:
             continue
-        ps = el.find_elements(By.XPATH, "./p")
+        ps = el.find_elements(By.XPATH, ".//p")
         if len(ps) != 2:
             continue
         label = ps[0].text.strip()
@@ -172,12 +188,56 @@ def _extract_flat(root):
     return [{"name": "", "status": "", "fields": fields}] if fields else []
 
 
+def _extract_tables(root):
+    """
+    A third layout, confirmed 2026-08-17 on Aadhaar to Ration: alongside its
+    "Registry Meta" field-card section, that tool ALSO renders a genuine
+    HTML <table> ("Family Member Profile") listing several people - one row
+    per person, not one field per person. Each <tbody> row becomes its own
+    record here (matching how a multi-person Mobile Info result already
+    gets one card per person), with <thead>/<th> text as field labels and
+    a "Name"-labeled column (case-insensitive) promoted to the record's own
+    name if present.
+    """
+    records = []
+    for table in root.find_elements(By.XPATH, ".//table"):
+        headers = [th.text.strip() for th in table.find_elements(By.XPATH, ".//thead//th")]
+        if not headers:
+            continue
+        for row in table.find_elements(By.XPATH, ".//tbody/tr"):
+            cells = row.find_elements(By.XPATH, "./td")
+            if not cells:
+                continue
+            fields = []
+            name = ""
+            for i, cell in enumerate(cells):
+                label = headers[i] if i < len(headers) else f"Column {i + 1}"
+                value = cell.text.strip()
+                if not value:
+                    continue
+                if not name and label.strip().lower() == "name":
+                    name = value
+                fields.append({"label": label, "value": value})
+            if fields:
+                records.append({"name": name, "status": "", "fields": fields})
+    return records
+
+
 def _extract_records(driver):
+    """
+    A single result page can mix layouts (Aadhaar to Ration shows a
+    field-card "Registry Meta" section AND a separate family-member
+    <table> at once) - every source is tried and combined rather than
+    stopping at the first non-empty one, so nothing found by a later
+    pattern gets silently dropped just because an earlier one already
+    matched something. Only falls back to the ungrouped flat scan when
+    NONE of the structured patterns found anything at all.
+    """
     root = _main_root(driver)
-    records = _extract_person_cards(root)
-    if records:
-        return records
-    records = _extract_sections(root)
+    records = []
+    records.extend(_extract_person_cards(root))
+    records.extend(_extract_sections(root))
+    records.extend(_extract_tables(root))
     if records:
         return records
     return _extract_flat(root)
