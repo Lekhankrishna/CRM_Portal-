@@ -187,6 +187,12 @@ require __DIR__ . '/includes/header.php';
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
+// Per explicit instruction: every search failure - regardless of cause
+// (bad input, quota reached, access not granted, a Selenium crash, a
+// timeout, an unreachable backend) - shows this same generic message to
+// the agent instead of whatever real error text the server returned.
+const SERVER_DOWN_MESSAGE = "Server is down. Please try again later.";
+
 const searchBtn      = document.getElementById("t2SearchBtn");
 const clearBtn       = document.getElementById("t2ClearBtn");
 const toolTabs       = document.getElementById("t2ToolTabs");
@@ -422,7 +428,7 @@ async function runSearch() {
   const tool = activeTool;
   const query = queryBox.value.trim();
   if (!query) {
-    statusEl.textContent = "Enter a value to search.";
+    statusEl.textContent = SERVER_DOWN_MESSAGE;
     return;
   }
 
@@ -444,7 +450,10 @@ async function runSearch() {
 
     if (!res.ok) {
       stopProgress(null);
-      statusEl.textContent = `Error: ${data.error || "could not complete search"}`;
+      // Per explicit instruction: every error (validation, quota, backend
+      // failure - no exceptions) shows this same generic message rather
+      // than whatever text the server actually returned in data.error.
+      statusEl.textContent = SERVER_DOWN_MESSAGE;
       if (typeof data.used === "number" && typeof data.limit === "number") {
         updateQuotaBadge(data.used, data.limit, data.unit);
       }
@@ -455,7 +464,7 @@ async function runSearch() {
     renderResult(data);
   } catch (err) {
     stopProgress(null);
-    statusEl.textContent = `Could not reach the server: ${err.message}`;
+    statusEl.textContent = SERVER_DOWN_MESSAGE;
   } finally {
     searchBtn.disabled = false;
   }
