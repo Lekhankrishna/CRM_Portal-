@@ -2,6 +2,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
+from selenium.common.exceptions import StaleElementReferenceException
 
 import time
 
@@ -264,16 +265,26 @@ def run_tool_search(tool_slug, query):
 
         deadline = time.time() + 30
         while time.time() < deadline:
-            page_text = _main_text(driver)
-            lower = page_text.lower()
+            try:
+                page_text = _main_text(driver)
+                lower = page_text.lower()
 
-            for needle in FAILURE_NEEDLES:
-                if needle in lower:
-                    return {"toolSlug": tool_slug, "query": query, "found": False}
+                for needle in FAILURE_NEEDLES:
+                    if needle in lower:
+                        return {"toolSlug": tool_slug, "query": query, "found": False}
 
-            records = _extract_records(driver)
-            if records:
-                return {"toolSlug": tool_slug, "query": query, "found": True, "records": records}
+                records = _extract_records(driver)
+                if records:
+                    return {"toolSlug": tool_slug, "query": query, "found": True, "records": records}
+            except StaleElementReferenceException:
+                # The page's own React app can swap DOM nodes out from under
+                # us mid-read (confirmed 2026-08-17, live on Aadhaar to
+                # Ration) while a result is still rendering - an element we
+                # just located genuinely stopped existing between being
+                # found and being read. Not a real failure, just caught
+                # mid-update; the next iteration re-queries everything from
+                # scratch, so retrying is always safe here.
+                pass
 
             time.sleep(1)
 
@@ -282,8 +293,13 @@ def run_tool_search(tool_slug, query):
         # sidebar/topbar chrome - see _main_text()) rather than silently
         # reporting nothing (e.g. a tool whose result layout matches neither
         # extractor, like WhatsApp DP Downloader's image output - see module
-        # docstring).
-        return {"toolSlug": tool_slug, "query": query, "found": True, "rawText": _main_text(driver)}
+        # docstring). Same stale-element risk as the loop above, so the same
+        # tolerance applies - one retry is enough since nothing should still
+        # be actively re-rendering once the 30s deadline has passed.
+        try:
+            return {"toolSlug": tool_slug, "query": query, "found": True, "rawText": _main_text(driver)}
+        except StaleElementReferenceException:
+            return {"toolSlug": tool_slug, "query": query, "found": True, "rawText": _main_text(driver)}
 
     finally:
         if driver is not None:
