@@ -350,9 +350,32 @@ def _search_one_number(driver, wait, mobile_input, mobile_number):
             )
         )
         driver.execute_script("arguments[0].click();", drilldown)
-        # Trimmed from 1.5s (found 2026-07-28, speeding up bulk search).
-        time.sleep(0.8)
         print(f"[field-debug] drilldown clicked for {mobile_number}", flush=True)
+
+        # A fixed 0.8s sleep here (trimmed from 1.5s on 2026-07-28 for bulk
+        # search speed) used to be the only wait before reading every field
+        # below - not always enough time for Siebel to finish rendering the
+        # Contact Form, confirmed 2026-08-16 from real searches coming back
+        # with Relationship Id (and sometimes DOB/Address) silently blank
+        # even for a genuine match. Polling for Relationship Id specifically
+        # to go non-empty is a proxy for "the form has actually rendered" -
+        # capped at 3s so a record that's genuinely missing it (not a timing
+        # issue) doesn't stall the whole search waiting for a value that will
+        # never come.
+        relationship_id_xpath = "//input[@aria-label='Relationship Id']"
+        deadline = time.time() + 3
+        while time.time() < deadline:
+            try:
+                el = driver.find_element(By.XPATH, relationship_id_xpath)
+                if (el.get_attribute("value") or "").strip():
+                    break
+            except Exception:
+                pass
+            time.sleep(0.2)
+        else:
+            # Timed out without a value - still give the rest of the form a
+            # brief moment, same floor as the old fixed sleep.
+            time.sleep(0.3)
     except Exception as e:
         # No result row to click — a genuine no-match. The field reads below
         # will all come back empty, same as any other not-found case.
