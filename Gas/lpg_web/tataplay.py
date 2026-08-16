@@ -204,8 +204,14 @@ def _get_last_recharge_date(driver, wait):
             cells = row.find_elements(By.TAG_NAME, "td")
             if len(cells) <= max(date_col, type_col):
                 continue
-            type_value = cells[type_col].text.strip()
-            if "recharge" not in type_value.lower():
+            # A real active account's Transaction History (confirmed
+            # 2026-08-16) never actually uses the word "Recharge" as a Type
+            # value - "Payments" is what an EVD/recharge transaction is typed
+            # as here; "NRC" (Non-Recurring Charge - activation fee, rental,
+            # etc.) is a one-time fee, not a recharge, so it's excluded even
+            # though it's also money changing hands.
+            type_value = cells[type_col].text.strip().lower()
+            if "payment" not in type_value and "recharge" not in type_value:
                 continue
             raw_date = cells[date_col].text.strip()
             parsed = _parse_transaction_date(raw_date)
