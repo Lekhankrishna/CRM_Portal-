@@ -193,6 +193,7 @@ function renderResult(data) {
       ["Account Name", data.accountName],
       ["Subscriber Id", data.subscriberId],
       ["Account Status", data.accountStatus],
+      ["Address", data.address],
     ];
     rows.forEach(([label, value]) => {
       const tr = document.createElement("tr");

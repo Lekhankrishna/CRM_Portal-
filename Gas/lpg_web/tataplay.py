@@ -96,14 +96,55 @@ def _parse_single_result(body_text):
     return fields
 
 
+# Field labels on the account DETAIL form (reached by drilling into the one
+# quick-find result) that make up a postal address - confirmed 2026-08-16
+# from a real account. Read via aria-label rather than title/name: these
+# inputs don't expose a title attribute the way the quick-find's own search
+# fields do.
+ADDRESS_ARIA_LABELS = ["Address Line 1", "Address Line 2", "Village/Town/City", "District", "State", "Pin Code"]
+
+
+def _open_account_detail_and_get_address(driver, wait):
+    """
+    Drills into the single quick-find result (a Siebel "drilldown" link that
+    Selenium considers not-interactable via a normal .click() - it's styled
+    TSLDisplayNone - so this fires the click via JS instead) and reads the
+    account detail form's address fields. Returns a formatted address string,
+    or "" if the detail page didn't load the expected fields in time.
+    """
+    link = wait.until(EC.presence_of_element_located((By.XPATH, "//a[@name='Title']")))
+    driver.execute_script("arguments[0].click();", link)
+
+    wait.until(lambda d: d.execute_script("return document.readyState") == "complete")
+
+    deadline = time.time() + 15
+    values = {}
+    while time.time() < deadline:
+        for label in ADDRESS_ARIA_LABELS:
+            if label in values:
+                continue
+            els = driver.find_elements(By.CSS_SELECTOR, f"input[aria-label='{label}']")
+            if els:
+                values[label] = els[0].get_attribute("value") or ""
+        if len(values) == len(ADDRESS_ARIA_LABELS):
+            break
+        time.sleep(0.5)
+
+    parts = [values.get(label, "").strip() for label in ADDRESS_ARIA_LABELS]
+    return ", ".join(p for p in parts if p)
+
+
 def run_tataplay_single(mobile_number):
     """
     Logs into the Tata Play distributor SSO portal and runs a single Account
     quick-find by mobile number, returning
-    {"mobileNumber", "found", "accountName", "subscriberId", "accountStatus"}
+    {"mobileNumber", "found", "accountName", "subscriberId", "accountStatus", "address"}
     on an unambiguous single-account match, or {"mobileNumber", "found": False}
     otherwise (no match, or an ambiguous multi-result fallback list - see
-    RESULT_COUNT_RE's comment).
+    RESULT_COUNT_RE's comment). "address" is best-effort - drilling into the
+    account detail form is a second page load that can fail independently of
+    the search itself, so a found account with an unreadable address still
+    comes back as found with address: "" rather than failing the whole search.
     """
 
     driver = None
@@ -127,12 +168,18 @@ def run_tataplay_single(mobile_number):
         if not fields:
             return {"mobileNumber": mobile_number, "found": False}
 
+        try:
+            address = _open_account_detail_and_get_address(driver, wait)
+        except Exception:
+            address = ""
+
         return {
             "mobileNumber": mobile_number,
             "found": True,
             "accountName": fields.get("Account", ""),
             "subscriberId": fields.get("Subscriber Id", ""),
             "accountStatus": fields.get("Account Status", ""),
+            "address": address,
         }
 
     finally:
