@@ -103,23 +103,38 @@ switch ($requiresAccess) {
 // Every tool spends real credits on the single shared locateme.services
 // account, so every agent is capped per calendar month (Admin > Agents) -
 // admins bypass this entirely, same as every other metered tool in this app.
+//
+// The generic Locate Me bucket (every tool except RC Print/HP Gas Advanced)
+// tracks the monthly limit as an actual CREDIT budget (2026-08-17) - a
+// cheap 1-credit search and an expensive 150-credit search used to count
+// identically against "N searches/month", which didn't reflect real
+// locateme.services spend. RC Print/HP Gas Advanced stay count-based
+// instead - each is a single fixed-cost tool (150 credits every time), so
+// a search count there is already just a constant multiple of credits,
+// and their existing admin-facing "N/month" limits predate this change.
+$creditsSpent  = locateMeCreditsFor($tool);
+$quotaIsCredits = ($requiresAccess === null);
+$quotaUnit      = $quotaIsCredits ? 'credits' : 'searches';
+$quotaSql = $quotaIsCredits
+    ? "SELECT COALESCE(SUM(credits_spent), 0) FROM search_logs WHERE user_id = :id AND search_type = :type AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+    : "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = :type AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')";
+
 if (($_SESSION['role'] ?? '') !== 'admin') {
     $stmt = $pdo->prepare("SELECT $limitColumn FROM users WHERE id = :id");
     $stmt->execute(['id' => $_SESSION['user_id']]);
     $limit = (int) $stmt->fetchColumn();
 
-    $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = :type AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
-    );
+    $stmt = $pdo->prepare($quotaSql);
     $stmt->execute(['id' => $_SESSION['user_id'], 'type' => $searchType]);
     $usedThisMonth = (int) $stmt->fetchColumn();
 
     if ($usedThisMonth >= $limit) {
         http_response_code(429);
         echo json_encode([
-            'error' => "Monthly $limitLabel limit reached ($usedThisMonth/$limit this month). Contact your admin to increase it, or try again next month.",
+            'error' => "Monthly $limitLabel limit reached ($usedThisMonth/$limit $quotaUnit this month). Contact your admin to increase it, or try again next month.",
             'used' => $usedThisMonth,
             'limit' => $limit,
+            'unit' => $quotaUnit,
         ]);
         exit;
     }
@@ -162,24 +177,24 @@ if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decode
         }
         $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
         $pdo->prepare(
-            "INSERT INTO search_logs (user_id, search_type, search_query, result_count, ip_address)
-             VALUES (:uid, :type, :q, :cnt, :ip)"
+            "INSERT INTO search_logs (user_id, search_type, search_query, result_count, credits_spent, ip_address)
+             VALUES (:uid, :type, :q, :cnt, :credits, :ip)"
         )->execute([
             'uid' => $_SESSION['user_id'],
             'type' => $searchType,
             'q' => LOCATEME_TOOLS[$tool]['label'] . ': ' . $query,
             'cnt' => $recordCount,
+            'credits' => $creditsSpent,
             'ip' => substr($ip, 0, 45),
         ]);
 
+        $decoded['unit'] = $quotaUnit;
         if (($_SESSION['role'] ?? '') !== 'admin') {
             $stmt = $pdo->prepare("SELECT $limitColumn FROM users WHERE id = :id");
             $stmt->execute(['id' => $_SESSION['user_id']]);
             $decoded['limit'] = (int) $stmt->fetchColumn();
 
-            $stmt = $pdo->prepare(
-                "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = :type AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
-            );
+            $stmt = $pdo->prepare($quotaSql);
             $stmt->execute(['id' => $_SESSION['user_id'], 'type' => $searchType]);
             $decoded['used'] = (int) $stmt->fetchColumn();
 

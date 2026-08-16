@@ -4,7 +4,12 @@ requireLocateMeAccess(); // requireLogin() + a 403 for logged-in users without t
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/includes/locateme_tools.php';
 
-// Same quota-badge pattern as hp_gas.php/rc_print.php.
+// Same quota-badge pattern as hp_gas.php/rc_print.php, but this badge
+// tracks the generic Locate Me bucket's actual CREDIT spend (2026-08-17),
+// not a search count - see locate_me_api.php's own comment on why. RC
+// Print/HP Gas Advanced's tabs still spend against their own separate,
+// count-based quotas (checked server-side per search, same as before);
+// this page-level badge only ever reflects the generic bucket.
 $isAdmin = ($_SESSION['role'] ?? '') === 'admin';
 $quota = null;
 if (!$isAdmin) {
@@ -13,7 +18,7 @@ if (!$isAdmin) {
     $monthlyLimit = (int) $stmt->fetchColumn();
 
     $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'locate_me' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+        "SELECT COALESCE(SUM(credits_spent), 0) FROM search_logs WHERE user_id = :id AND search_type = 'locate_me' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
     );
     $stmt->execute(['id' => $_SESSION['user_id']]);
     $usedThisMonth = (int) $stmt->fetchColumn();
@@ -36,7 +41,7 @@ require __DIR__ . '/includes/header.php';
   <?php elseif ($quota !== null): ?>
     <span id="lmQuotaBadge" class="badge <?= $quota['used'] >= $quota['limit'] ? 'badge-danger' : 'badge-neutral' ?>"
           style="margin-left:auto">
-      <?= $quota['limit'] - $quota['used'] > 0 ? $quota['limit'] - $quota['used'] : 0 ?> of <?= $quota['limit'] ?> left this month
+      <?= $quota['limit'] - $quota['used'] > 0 ? $quota['limit'] - $quota['used'] : 0 ?> of <?= $quota['limit'] ?> credits left this month
     </span>
   <?php endif; ?>
 </div>
@@ -257,10 +262,13 @@ function stopProgress(finalLabel) {
   }
 }
 
-function updateQuotaBadge(used, limit) {
+// unit is "credits" for every tool except RC Print/HP Gas Advanced, which
+// still spend against their own separate, count-based quotas ("searches")
+// - see locate_me_api.php's own comment on why those two stayed count-based.
+function updateQuotaBadge(used, limit, unit) {
   if (!quotaBadge) return;
   const remaining = Math.max(0, limit - used);
-  quotaBadge.textContent = `${remaining} of ${limit} left this month`;
+  quotaBadge.textContent = `${remaining} of ${limit} ${unit || "credits"} left this month`;
   quotaBadge.classList.toggle("badge-danger", used >= limit);
   quotaBadge.classList.toggle("badge-neutral", used < limit);
 }
@@ -340,7 +348,7 @@ function renderResult(data) {
     pdfWrap.style.display = "block";
     startConfetti();
     if (typeof data.used === "number" && typeof data.limit === "number") {
-      updateQuotaBadge(data.used, data.limit);
+      updateQuotaBadge(data.used, data.limit, data.unit);
     }
     return;
   }
@@ -366,7 +374,7 @@ function renderResult(data) {
 
   if (records.length) startConfetti(); else stopConfetti();
   if (typeof data.used === "number" && typeof data.limit === "number") {
-    updateQuotaBadge(data.used, data.limit);
+    updateQuotaBadge(data.used, data.limit, data.unit);
   }
 }
 
@@ -438,7 +446,7 @@ async function runSearch() {
       stopProgress(null);
       statusEl.textContent = `Error: ${data.error || "could not complete search"}`;
       if (typeof data.used === "number" && typeof data.limit === "number") {
-        updateQuotaBadge(data.used, data.limit);
+        updateQuotaBadge(data.used, data.limit, data.unit);
       }
       return;
     }

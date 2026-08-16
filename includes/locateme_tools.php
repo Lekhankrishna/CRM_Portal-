@@ -59,3 +59,19 @@ const LOCATEME_TOOLS = [
 function locateMeSelectableTools(): array {
     return array_filter(LOCATEME_TOOLS, fn($t) => !isset($t['requiresAccess']));
 }
+
+// A handful of tools have never actually been searched live, so their real
+// locateme.services cost is unconfirmed (credits => null above - see each
+// one's discovery note in Gas/lpg_web/locate_tools.py's TOOL_REGISTRY).
+// locate_me_api.php's credit-budget quota (2026-08-17) still needs SOME
+// number to charge against the monthly limit for these, rather than
+// treating them as free - a mid-range placeholder, roughly the average of
+// the confirmed costs (1-150), errs toward not undercharging. Update the
+// registry's real 'credits' value directly once a tool's actual cost is
+// observed from a real search, same as every already-confirmed entry was.
+const LOCATEME_UNKNOWN_COST_CREDITS = 30;
+
+function locateMeCreditsFor(string $toolSlug): int {
+    $credits = LOCATEME_TOOLS[$toolSlug]['credits'] ?? null;
+    return $credits ?? LOCATEME_UNKNOWN_COST_CREDITS;
+}

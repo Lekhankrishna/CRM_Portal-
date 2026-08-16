@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $role      = ($_POST['role'] ?? 'agent') === 'admin' ? 'admin' : 'agent';
         $lpgAccess = isset($_POST['lpg_search_access']) ? 1 : 0;
         $locateMeAccess = isset($_POST['locate_me_access']) ? 1 : 0;
-        $locateMeMonthlyLimit = min(65535, max(0, (int) ($_POST['locate_me_monthly_limit'] ?? 5)));
+        $locateMeMonthlyLimit = min(65535, max(0, (int) ($_POST['locate_me_monthly_limit'] ?? 1000)));
         $locateMeTools = locateMeToolsFromPost($LOCATEME_SELECTABLE_SLUGS);
         $rcPrintAccess = isset($_POST['rc_print_access']) ? 1 : 0;
         $rcPrintMonthlyLimit = min(65535, max(0, (int) ($_POST['rc_print_monthly_limit'] ?? 5)));
@@ -110,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $role     = ($_POST['role'] ?? 'agent') === 'admin' ? 'admin' : 'agent';
         $lpgAccess = isset($_POST['lpg_search_access']) ? 1 : 0;
         $locateMeAccess = isset($_POST['locate_me_access']) ? 1 : 0;
-        $locateMeMonthlyLimit = min(65535, max(0, (int) ($_POST['locate_me_monthly_limit'] ?? 5)));
+        $locateMeMonthlyLimit = min(65535, max(0, (int) ($_POST['locate_me_monthly_limit'] ?? 1000)));
         $locateMeTools = locateMeToolsFromPost($LOCATEME_SELECTABLE_SLUGS);
         $rcPrintAccess = isset($_POST['rc_print_access']) ? 1 : 0;
         $rcPrintMonthlyLimit = min(65535, max(0, (int) ($_POST['rc_print_monthly_limit'] ?? 5)));
@@ -432,8 +432,8 @@ require __DIR__ . '/../includes/header.php';
       <label class="acf-feature">
         <input type="checkbox" name="locate_me_access" id="create-locate_me_access" value="1">
         <span>Locate Me</span>
-        <span class="acf-limit" title="How many Locate Me searches this agent can run per calendar month, across whichever tools are checked below - each spends real credits (1-150/search depending on the tool) on the shared locateme.services account. Ignored for admins.">
-          <input type="number" name="locate_me_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
+        <span class="acf-limit" title="Total locateme.services credits this agent can spend per calendar month, across whichever tools are checked below - a cheap 1-credit search and an expensive 150-credit search count differently against this budget, not 1-for-1. Ignored for admins.">
+          <input type="number" name="locate_me_monthly_limit" value="1000" min="0" max="65535" onclick="event.stopPropagation()">cr/mo
         </span>
       </label>
       <label class="acf-feature">
@@ -591,7 +591,7 @@ require __DIR__ . '/../includes/header.php';
               $uToolCount = $u['locate_me_tools'] !== null ? count(json_decode($u['locate_me_tools'], true) ?: []) : count($LOCATEME_SELECTABLE_SLUGS);
             ?>
               <div class="text-sm text-muted" style="margin-top:2px">
-                <?= $uToolCount ?>/<?= count($LOCATEME_SELECTABLE_SLUGS) ?> tools<?= $u['role'] !== 'admin' ? ', ' . (int) $u['locate_me_monthly_limit'] . '/month' : '' ?>
+                <?= $uToolCount ?>/<?= count($LOCATEME_SELECTABLE_SLUGS) ?> tools<?= $u['role'] !== 'admin' ? ', ' . (int) $u['locate_me_monthly_limit'] . ' cr/mo' : '' ?>
               </div>
             <?php endif; ?>
           </td>
@@ -744,8 +744,8 @@ require __DIR__ . '/../includes/header.php';
           <label class="acf-feature">
             <input type="checkbox" name="locate_me_access" id="edit-locate_me_access" value="1">
             <span>Locate Me</span>
-            <span class="acf-limit" title="How many Locate Me searches this agent can run per calendar month - each one spends real credits (100/search) on the shared locateme.services account. Ignored for admins.">
-              <input type="number" name="locate_me_monthly_limit" id="edit-locate_me_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
+            <span class="acf-limit" title="Total locateme.services credits this agent can spend per calendar month, across whichever tools are checked below - a cheap 1-credit search and an expensive 150-credit search count differently against this budget, not 1-for-1. Ignored for admins.">
+              <input type="number" name="locate_me_monthly_limit" id="edit-locate_me_monthly_limit" value="1000" min="0" max="65535" onclick="event.stopPropagation()">cr/mo
             </span>
           </label>
           <label class="acf-feature">
@@ -1005,7 +1005,7 @@ const AGENTS_EXPORT_DATA = <?= json_encode(array_map(function ($u) {
         'role' => ucfirst($u['role']),
         'status' => $isExpired ? 'Expired' : ($u['is_active'] ? 'Active' : 'Paused'),
         'lpg' => $u['lpg_search_access'] ? 'Granted' : 'Not Granted',
-        'locate_me' => $u['locate_me_access'] ? "Granted ({$u['locate_me_monthly_limit']}/mo)" : 'Not Granted',
+        'locate_me' => $u['locate_me_access'] ? "Granted ({$u['locate_me_monthly_limit']} cr/mo)" : 'Not Granted',
         'pan_india' => $u['pan_india_access'] ? 'Granted' : 'Not Granted',
         'rc_print' => $u['rc_print_access'] ? "Granted ({$u['rc_print_monthly_limit']}/mo)" : 'Not Granted',
         'hp_gas' => $u['hp_gas_access'] ? "Granted ({$u['hp_gas_monthly_limit']}/mo)" : 'Not Granted',
