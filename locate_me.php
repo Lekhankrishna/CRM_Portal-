@@ -103,16 +103,26 @@ require __DIR__ . '/includes/header.php';
     cursor:pointer;transition:all 150ms;white-space:nowrap;}
   .lm-tab:hover{border-color:#4f46e5;color:#4f46e5;}
   .lm-tab.active{background:#4f46e5;border-color:#4f46e5;color:#fff;box-shadow:0 4px 14px rgba(79,70,229,.35);}
+  /* RC Print's result is a PDF, not label/value fields - same iframe
+     preview + download pattern as the old standalone rc_print.php. */
+  .lm-pdf-wrap{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-top:16px;overflow:hidden;display:none;}
+  .lm-pdf-frame{width:100%;height:80vh;border:none;display:block;}
 </style>
 
 <div class="lm-card">
   <div class="lm-card-body">
     <p class="lm-hint">Pick a tool, then enter the matching value to search locateme.services' database.</p>
     <div class="lm-tabs" id="lmToolTabs" role="tablist">
-      <?php foreach (LOCATEME_TOOLS as $slug => $tool): ?>
+      <?php foreach (LOCATEME_TOOLS as $slug => $toolDef):
+        // RC Print/HP Gas Advanced only show up here for agents who already
+        // have that specific access - see includes/locateme_tools.php.
+        $requires = $toolDef['requiresAccess'] ?? null;
+        if ($requires === 'rc_print' && !hasRcPrintAccess()) continue;
+        if ($requires === 'hp_gas' && !hasHpGasAccess()) continue;
+      ?>
         <button type="button" class="lm-tab<?= $slug === 'mobile-info' ? ' active' : '' ?>"
-                data-tool="<?= htmlspecialchars($slug) ?>" data-placeholder="<?= htmlspecialchars($tool['placeholder']) ?>">
-          <?= htmlspecialchars($tool['label']) ?>
+                data-tool="<?= htmlspecialchars($slug) ?>" data-placeholder="<?= htmlspecialchars($toolDef['placeholder']) ?>">
+          <?= htmlspecialchars($toolDef['label']) ?>
         </button>
       <?php endforeach; ?>
     </div>
@@ -143,6 +153,15 @@ require __DIR__ . '/includes/header.php';
   <div id="lmRecordsWrap"></div>
 </div>
 <div class="lm-raw-body" id="lmRawBody"></div>
+<div class="lm-pdf-wrap" id="lmPdfWrap">
+  <div class="lm-result-toolbar">
+    <span class="lm-result-count" id="lmPdfCountText"></span>
+    <button id="lmPdfDownloadBtn" class="lm-export-btn" type="button">
+      <i class="bi bi-download"></i> Download PDF
+    </button>
+  </div>
+  <iframe class="lm-pdf-frame" id="lmPdfFrame" title="RC PDF Preview"></iframe>
+</div>
 <div class="lm-no-results" id="lmNoResults" style="display:none">
   <i class="bi bi-search"></i>
   <span>No records found</span>
@@ -160,6 +179,10 @@ const resultCountText= document.getElementById("lmResultCountText");
 const exportBtn      = document.getElementById("lmExportBtn");
 const recordsWrap    = document.getElementById("lmRecordsWrap");
 const rawBody        = document.getElementById("lmRawBody");
+const pdfWrap        = document.getElementById("lmPdfWrap");
+const pdfFrame       = document.getElementById("lmPdfFrame");
+const pdfCountText   = document.getElementById("lmPdfCountText");
+const pdfDownloadBtn = document.getElementById("lmPdfDownloadBtn");
 const noResultsEl    = document.getElementById("lmNoResults");
 const quotaBadge     = document.getElementById("lmQuotaBadge");
 const progressWrap   = document.getElementById("lmProgressWrap");
@@ -283,14 +306,31 @@ function buildRecordCard(record) {
 }
 
 let lastRecords = [];
+let lastPdfDataUri = null;
 
 function renderResult(data) {
   recordsWrap.innerHTML = "";
   resultWrap.style.display = "none";
   rawBody.style.display = "none";
+  pdfWrap.style.display = "none";
   noResultsEl.style.display = "none";
   exportBtn.disabled = true;
   lastRecords = [];
+  lastPdfDataUri = null;
+
+  // RC Print's result is a PDF, not label/value fields - handled first
+  // and separately from the records/rawText/no-results paths below.
+  if (data.pdfDataUri) {
+    lastPdfDataUri = data.pdfDataUri;
+    pdfFrame.src = data.pdfDataUri + "#toolbar=0&navpanes=0";
+    pdfCountText.textContent = data.query || "";
+    pdfWrap.style.display = "block";
+    startConfetti();
+    if (typeof data.used === "number" && typeof data.limit === "number") {
+      updateQuotaBadge(data.used, data.limit);
+    }
+    return;
+  }
 
   const records = (data.found && Array.isArray(data.records)) ? data.records : [];
 
@@ -347,6 +387,16 @@ exportBtn.addEventListener("click", () => {
   XLSX.writeFile(wb, `locate-me-${activeTool}-${stamp}.xlsx`);
 });
 
+pdfDownloadBtn.addEventListener("click", () => {
+  if (!lastPdfDataUri) return;
+  const a = document.createElement("a");
+  a.href = lastPdfDataUri;
+  a.download = `RC_${pdfCountText.textContent || "print"}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+});
+
 async function runSearch() {
   const tool = activeTool;
   const query = queryBox.value.trim();
@@ -359,6 +409,7 @@ async function runSearch() {
   statusEl.textContent = "";
   resultWrap.style.display = "none";
   rawBody.style.display = "none";
+  pdfWrap.style.display = "none";
   noResultsEl.style.display = "none";
   startProgress();
 
@@ -398,9 +449,12 @@ clearBtn.addEventListener("click", () => {
   statusEl.textContent = "";
   resultWrap.style.display = "none";
   rawBody.style.display = "none";
+  pdfWrap.style.display = "none";
+  pdfFrame.src = "";
   noResultsEl.style.display = "none";
   exportBtn.disabled = true;
   lastRecords = [];
+  lastPdfDataUri = null;
   stopProgress(null);
   stopConfetti();
 });

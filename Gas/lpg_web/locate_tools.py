@@ -6,7 +6,8 @@ from selenium.webdriver.common.keys import Keys
 import time
 
 from lpg_search import _create_driver, _quit_driver_with_timeout
-from rc_print import _login
+from rc_print import _login, run_rc_print
+from hp_gas import run_hp_gas_single
 
 LOCATEME_BASE = "https://locateme.services/tools"
 
@@ -45,6 +46,8 @@ LOCATEME_BASE = "https://locateme.services/tools"
 # actually needed.
 TOOL_REGISTRY = {
     "mobile-info":              {"label": "Mobile Info",              "placeholder": "Enter Mobile Number",   "credits": 100},
+    "rc-print":                 {"label": "RC PRINT",                 "placeholder": "Enter Vehicle Number",  "credits": 150},
+    "hp-gas-advanced":          {"label": "HP Gas Advanced",          "placeholder": "Enter Mobile Number",   "credits": 150},
     "vehicle-info":              {"label": "Vehicle Intelligence",     "placeholder": "Enter Vehicle Number",  "credits": 100},
     "aadhaar-info":               {"label": "Aadhaar Info",             "placeholder": "Enter Aadhaar Number",  "credits": 100},
     "sms-header-decode":         {"label": "SMS Header Decode",        "placeholder": "e.g. SGILTD",           "credits": 1},
@@ -83,7 +86,29 @@ FIELD_PAIR_XPATH = ".//*[count(./p) = 2]"
 FAILURE_NEEDLES = (
     "not found", "no record", "no results", "no matching", "no data found",
     "invalid", "insufficient credit", "error occurred", "something went wrong",
+    # Confirmed live 2026-08-17: genuine upstream failures on the site's own
+    # side, not extraction bugs - surfacing these as a clean "not found"
+    # instead of a raw-text dump.
+    "api error", "service error", "cooldown",
 )
+
+
+def _is_loading_placeholder(value):
+    """
+    A live 20-tool verification pass (2026-08-17) found this site shows a
+    themed loading animation ("SYNCHRONIZING REGISTRY NODE" / "ESTABLISHING
+    SECURE HANDSHAKE...") on at least 7 of 24 tools while a search is still
+    in flight - and it renders as a label/value pair matching the exact
+    same "two <p> children" shape a genuine result field does, since it's
+    built from the same UI component. Every placeholder value observed
+    ends in an ellipsis, while no genuine field value seen on any tool
+    does - filtering these out keeps the poll loop waiting for the real
+    result instead of returning the animation text as if it were the
+    final answer (confirmed: this was silently corrupting results for
+    Vehicle Intelligence, Aadhaar Info, IMEI Info, Aadhaar to PAN, PAN
+    Info, GST Info, and SMS Header Decode until this fix).
+    """
+    return value.rstrip().endswith(("...", "…"))
 
 
 def _field_pairs_within(root):
@@ -92,7 +117,7 @@ def _field_pairs_within(root):
         ps = el.find_elements(By.XPATH, "./p")
         label = ps[0].text.strip()
         value = ps[1].text.strip()
-        if label:
+        if label and not _is_loading_placeholder(value):
             fields.append({"label": label, "value": value})
     return fields
 
@@ -135,7 +160,7 @@ def _extract_sections(root):
             continue
         label = ps[0].text.strip()
         value = ps[1].text.strip()
-        if label:
+        if label and not _is_loading_placeholder(value):
             current["fields"].append({"label": label, "value": value})
 
     return [s for s in sections if s["fields"]]
@@ -189,9 +214,33 @@ def run_tool_search(tool_slug, query):
     {"toolSlug", "query", "found": True, "rawText": "..."} if the page
     rendered something but not in the expected card shape (untested tool,
     or a genuinely different result layout - see module docstring).
+
+    rc-print and hp-gas-advanced are special-cased to delegate straight to
+    rc_print.py's run_rc_print()/hp_gas.py's run_hp_gas_single() - both
+    already proven in production (their own dedicated pages/APIs used
+    these directly for weeks before being folded into Locate Me as tabs,
+    2026-08-17) - rather than routing them through this module's generic
+    scraper, which has already been caught guessing wrong on other tools'
+    exact markup. No reason to risk two tools that already work.
     """
     if tool_slug not in TOOL_REGISTRY:
         raise ValueError(f"Unknown locateme.services tool: {tool_slug}")
+
+    if tool_slug == "rc-print":
+        result = run_rc_print(query)
+        return {"toolSlug": tool_slug, "query": query, "found": True, "pdfDataUri": result["pdfDataUri"]}
+
+    if tool_slug == "hp-gas-advanced":
+        result = run_hp_gas_single(query)
+        if not result.get("found"):
+            return {"toolSlug": tool_slug, "query": query, "found": False}
+        records = [
+            {"name": s["title"], "status": "", "fields": s["fields"]}
+            for s in result.get("sections", [])
+        ]
+        if not records:
+            return {"toolSlug": tool_slug, "query": query, "found": True, "rawText": result.get("rawText", "")}
+        return {"toolSlug": tool_slug, "query": query, "found": True, "records": records}
 
     driver = None
     try:

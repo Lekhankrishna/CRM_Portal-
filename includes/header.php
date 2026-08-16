@@ -28,26 +28,21 @@ if (hasAdvancedSearchAccess()) {
     array_unshift($searchRegionsExtra, ['label' => 'Advanced Search', 'href' => 'advanced_search.php']);
 }
 // Locate Me is opt-in per account (Admin > Agents > "Locate Me Access") -
-// embeds locateme.services' own dashboard (26+ OSINT tools) directly in an
-// iframe inside the CRM's layout, rather than one automated single-purpose
-// page per tool like RC Print/HP Gas below. Placed directly under Advanced
-// Search per explicit instruction - inserted at index 1 so it lands right
-// after Advanced Search regardless of whether Advanced Search itself was
-// unshifted above (index 0) or this account doesn't have that access
-// (in which case it simply becomes the new first item).
+// drives every locateme.services tool (Mobile Info, Vehicle Intelligence,
+// UPI Finder, etc. - see includes/locateme_tools.php) as tabs on one page,
+// via Gas/lpg_web/locate_tools.py's generic scraper. RC Print and HP Gas
+// Advanced (2026-08-17) are folded in here as tabs too, replacing their
+// own former standalone sidebar entries below - each still gated by its
+// own pre-existing access flag (hasRcPrintAccess()/hasHpGasAccess()),
+// checked inside locate_me.php itself for tab visibility rather than here,
+// since they're not separate nav items anymore. Placed directly under
+// Advanced Search per explicit instruction - inserted at index 1 so it
+// lands right after Advanced Search regardless of whether Advanced Search
+// itself was unshifted above (index 0) or this account doesn't have that
+// access (in which case it simply becomes the new first item).
 if (hasLocateMeAccess()) {
     $locateMeIndex = hasAdvancedSearchAccess() ? 1 : 0;
     array_splice($searchRegionsExtra, $locateMeIndex, 0, [['label' => 'Locate Me', 'href' => 'locate_me.php']]);
-}
-// RC Print is opt-in per account (Admin > Agents > "RC Print Access") - same
-// pattern as LPG Search below. rc_print.php fetches a vehicle's RC PDF
-// server-side via rc_print_api.php -> Gas/lpg_web's /api/rc-print (Selenium,
-// same shape as the LPG bulk search automation) and renders it in the CRM's
-// own interface, rather than linking out to locateme.services directly. The
-// locateme.services login itself is hardcoded in Gas/lpg_web/rc_print.py,
-// same as lpg_search.py's SDMS USERNAME/PASSWORD - not in this app's DB.
-if (hasRcPrintAccess()) {
-    $searchRegionsExtra[] = ['label' => 'RC Print', 'href' => 'rc_print.php'];
 }
 // Pan India is opt-in per account (Admin > Agents > "Pan India Access"),
 // same as LPG Search below (2026-08-19 - previously unconditional for every
@@ -73,12 +68,6 @@ if (hasEagleEyeAccess()) {
 // Advance Pan India per explicit instruction.
 if (hasPanIndiaProAccess()) {
     $searchRegionsExtra[] = ['label' => 'Night Out', 'href' => 'pan_india_pro.php'];
-}
-// HP LPG Search is opt-in per account (Admin > Agents > "HP Gas Access") -
-// same pattern as RC Print above (own hp_gas.py automation against the same
-// locateme.services login, proxied through hp_gas_api.php).
-if (hasHpGasAccess()) {
-    $searchRegionsExtra[] = ['label' => 'HP LPG Search', 'href' => 'hp_gas.php'];
 }
 // LPG Search is opt-in per account (Admin > Agents > "LPG Search Access") —
 // only add the menu item at all when the current user has been granted it.
