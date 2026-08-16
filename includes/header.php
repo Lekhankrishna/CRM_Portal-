@@ -92,7 +92,7 @@ if (hasLpgSearchAccess()) {
 // tataplay_api.php). Placed directly below Indian LPG Search per explicit
 // instruction.
 if (hasTataPlayAccess()) {
-    $searchRegionsExtra[] = ['label' => 'Tata Play Search', 'href' => 'tataplay.php'];
+    $searchRegionsExtra[] = ['label' => 'TATA SKY DTH', 'href' => 'tataplay.php'];
 }
 $selectedState = $_GET['state'] ?? '';
 

@@ -457,7 +457,7 @@ require __DIR__ . '/../includes/header.php';
       </label>
       <label class="acf-feature">
         <input type="checkbox" name="tata_play_access" value="1">
-        <span>Tata Play Search</span>
+        <span>TATA SKY DTH</span>
         <span class="acf-limit" title="How many Tata Play searches this agent can run per calendar month - each one logs into the distributor's own mysso.tataplay.com account. Ignored for admins.">
           <input type="number" name="tata_play_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
         </span>
@@ -549,7 +549,7 @@ require __DIR__ . '/../includes/header.php';
           <th>Pan India</th>
           <th>RC Print</th>
           <th>HP Gas</th>
-          <th>Tata Play</th>
+          <th>TATA SKY DTH</th>
           <th>Adv. Pan India</th>
           <th>Night Out</th>
           <th>Advanced Search</th>
@@ -769,7 +769,7 @@ require __DIR__ . '/../includes/header.php';
           </label>
           <label class="acf-feature">
             <input type="checkbox" name="tata_play_access" id="edit-tata_play_access" value="1">
-            <span>Tata Play Search</span>
+            <span>TATA SKY DTH</span>
             <span class="acf-limit" title="How many Tata Play searches this agent can run per calendar month - each one logs into the distributor's own mysso.tataplay.com account. Ignored for admins.">
               <input type="number" name="tata_play_monthly_limit" id="edit-tata_play_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
             </span>
@@ -1023,7 +1023,7 @@ const AGENTS_EXPORT_DATA = <?= json_encode(array_map(function ($u) {
 }, $users), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 
 document.getElementById('export-accounts-btn').addEventListener('click', () => {
-  const headers = ['ID', 'Username', 'Full Name', 'Mobile Number', 'Role', 'Status', 'LPG', 'Tracing 2.0', 'Pan India', 'RC Print', 'HP Gas', 'Tata Play', 'Adv. Pan India', 'Night Out', 'Advanced Search', 'Max Logins', 'Expiry', 'Created At', 'Last Login'];
+  const headers = ['ID', 'Username', 'Full Name', 'Mobile Number', 'Role', 'Status', 'LPG', 'Tracing 2.0', 'Pan India', 'RC Print', 'HP Gas', 'TATA SKY DTH', 'Adv. Pan India', 'Night Out', 'Advanced Search', 'Max Logins', 'Expiry', 'Created At', 'Last Login'];
   const aoa = [headers, ...AGENTS_EXPORT_DATA.map(u => [
     u.id, u.username, u.full_name, u.mobile_no, u.role, u.status, u.lpg, u.tracing2, u.pan_india,
     u.rc_print, u.hp_gas, u.tata_play, u.adv_pan_india, u.pan_india_pro, u.advanced_search, u.max_logins, u.expires_at, u.created_at, u.last_login_at,

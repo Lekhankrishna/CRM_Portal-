@@ -29,7 +29,7 @@ require __DIR__ . '/includes/header.php';
 <div class="confetti-container" id="confetti-container"></div>
 
 <div class="page-header" style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
-  <h1 class="page-title" style="margin:0"><i class="bi bi-tv"></i> Tata Play Search</h1>
+  <h1 class="page-title" style="margin:0"><i class="bi bi-tv"></i> TATA SKY DTH</h1>
   <?php if ($isAdmin): ?>
     <span id="tpQuotaBadge" class="badge badge-neutral" style="margin-left:auto">Unlimited (Admin)</span>
   <?php elseif ($quota !== null): ?>
