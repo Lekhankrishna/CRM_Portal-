@@ -198,12 +198,24 @@ def _extract_tables(root):
     gets one card per person), with <thead>/<th> text as field labels and
     a "Name"-labeled column (case-insensitive) promoted to the record's own
     name if present.
+
+    Each row also carries a "section" value - the table's own preceding
+    <h3> heading text (e.g. "Family Member Profile (5)"), found via
+    preceding::h3[1] (nearest earlier <h3> in document order, regardless of
+    nesting depth, same "just find the closest one" approach already used
+    to pair section headers with their fields in _extract_sections()). The
+    frontend groups consecutive records sharing a "section" under one
+    shared heading instead of repeating it - see tracing2.php's
+    renderResult(). Records from every other extractor leave "section"
+    empty, so they render as standalone cards same as before.
     """
     records = []
     for table in root.find_elements(By.XPATH, ".//table"):
         headers = [th.text.strip() for th in table.find_elements(By.XPATH, ".//thead//th")]
         if not headers:
             continue
+        heading_els = table.find_elements(By.XPATH, "preceding::h3[1]")
+        section = heading_els[0].text.strip() if heading_els else ""
         for row in table.find_elements(By.XPATH, ".//tbody/tr"):
             cells = row.find_elements(By.XPATH, "./td")
             if not cells:
@@ -219,7 +231,7 @@ def _extract_tables(root):
                     name = value
                 fields.append({"label": label, "value": value})
             if fields:
-                records.append({"name": name, "status": "", "fields": fields})
+                records.append({"name": name, "status": "", "fields": fields, "section": section})
     return records
 
 

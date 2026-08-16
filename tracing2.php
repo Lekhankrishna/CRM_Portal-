@@ -80,6 +80,9 @@ require __DIR__ . '/includes/header.php';
     display:inline-flex;align-items:center;gap:8px;transition:all 150ms;}
   .t2-export-btn:hover:not(:disabled){background:#0d9668;transform:translateY(-1px);box-shadow:0 6px 20px rgba(16,185,129,.45);}
   .t2-export-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none;}
+  .t2-group-heading{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+    color:#4f46e5;margin:20px 0 8px;padding-bottom:6px;border-bottom:2px solid #e2e2ea;}
+  .t2-group-heading:first-child{margin-top:0;}
   .t2-record{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;margin-bottom:14px;}
   .t2-record-header{padding:12px 16px;background:#4f46e5;color:#fff;display:flex;align-items:center;gap:10px;}
   .t2-record-header i{font-size:16px;}
@@ -365,7 +368,26 @@ function renderResult(data) {
     lastRecords = records;
     resultCountText.textContent = `${records.length} result${records.length === 1 ? "" : "s"} found`;
     exportBtn.disabled = false;
-    records.forEach(r => recordsWrap.appendChild(buildRecordCard(r)));
+    // Records from a table-shaped result (e.g. "Family Member Profile" -
+    // see tracing2_tools.py's _extract_tables()) carry a shared "section"
+    // name - grouped here under one heading instead of repeating it above
+    // every single card. Records with no section (the common case) render
+    // as standalone cards, same as before.
+    let lastSection = null;
+    records.forEach(r => {
+      if (r.section) {
+        if (r.section !== lastSection) {
+          const heading = document.createElement("div");
+          heading.className = "t2-group-heading";
+          heading.textContent = r.section;
+          recordsWrap.appendChild(heading);
+          lastSection = r.section;
+        }
+      } else {
+        lastSection = null;
+      }
+      recordsWrap.appendChild(buildRecordCard(r));
+    });
     resultWrap.style.display = "block";
   } else if (data.found && data.rawText) {
     // Fallback if locateme.services' DOM structure matches neither
