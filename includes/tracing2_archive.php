@@ -1,5 +1,5 @@
 <?php
-// Archives every agent's Locate Me (Mobile Info) search results to a shared
+// Archives every agent's Tracing 2.0 (Mobile Info) search results to a shared
 // file on the D: drive - same architecture/reasoning as
 // includes/pan_india_archive.php (file-based, not a DB table, so this
 // survives independently of the CRM's own database if that's ever
@@ -8,17 +8,17 @@
 // every linked subscriber - see Gas/lpg_web/mobile_info.py), so this writes
 // one archive row per record, same as pan_india_archive.php's per-block rows.
 
-const LOCATEME_ARCHIVE_DIR = 'D:/LocateMeSearchArchive';
-const LOCATEME_ARCHIVE_CSV = LOCATEME_ARCHIVE_DIR . '/records.csv';
-const LOCATEME_ARCHIVE_INDEX = LOCATEME_ARCHIVE_DIR . '/dedup_index.txt';
+const TRACING2_ARCHIVE_DIR = 'D:/Tracing2SearchArchive';
+const TRACING2_ARCHIVE_CSV = TRACING2_ARCHIVE_DIR . '/records.csv';
+const TRACING2_ARCHIVE_INDEX = TRACING2_ARCHIVE_DIR . '/dedup_index.txt';
 
 // Best-effort archive: never let a D:-drive/permission problem break the
 // actual search response an agent is waiting on. $records is the "records"
-// array from a found locate_me_api.php response - each record is
+// array from a found tracing2_api.php response - each record is
 // ['name' => ..., 'status' => ..., 'fields' => [['label' => ..., 'value' => ...], ...]].
-function archiveLocateMeResults(array $records, string $searchedBy, string $query): void {
+function archiveTracing2Results(array $records, string $searchedBy, string $query): void {
     try {
-        if (!is_dir(LOCATEME_ARCHIVE_DIR) && !@mkdir(LOCATEME_ARCHIVE_DIR, 0777, true)) return;
+        if (!is_dir(TRACING2_ARCHIVE_DIR) && !@mkdir(TRACING2_ARCHIVE_DIR, 0777, true)) return;
 
         // Known field labels get their own column (Excel-friendly); anything
         // else - a label wording that varies by record - still gets kept,
@@ -36,8 +36,8 @@ function archiveLocateMeResults(array $records, string $searchedBy, string $quer
             "Father's Name", 'Email Node', 'ID Linkage', 'Registry Address'];
         $header = array_merge(['Timestamp', 'Searched By', 'Query'], $dataColumns, ['Other Fields']);
 
-        $seenHashes = is_file(LOCATEME_ARCHIVE_INDEX)
-            ? array_flip(file(LOCATEME_ARCHIVE_INDEX, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES))
+        $seenHashes = is_file(TRACING2_ARCHIVE_INDEX)
+            ? array_flip(file(TRACING2_ARCHIVE_INDEX, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES))
             : [];
 
         $newRows = [];
@@ -85,8 +85,8 @@ function archiveLocateMeResults(array $records, string $searchedBy, string $quer
 
         if (!$newRows) return;
 
-        $isNewFile = !is_file(LOCATEME_ARCHIVE_CSV);
-        $fh = @fopen(LOCATEME_ARCHIVE_CSV, 'a');
+        $isNewFile = !is_file(TRACING2_ARCHIVE_CSV);
+        $fh = @fopen(TRACING2_ARCHIVE_CSV, 'a');
         if ($fh && flock($fh, LOCK_EX)) {
             if ($isNewFile) fputcsv($fh, $header);
             foreach ($newRows as $row) fputcsv($fh, array_map(fn($c) => $row[$c] ?? '', $header));
@@ -94,7 +94,7 @@ function archiveLocateMeResults(array $records, string $searchedBy, string $quer
         }
         if ($fh) fclose($fh);
 
-        $ih = @fopen(LOCATEME_ARCHIVE_INDEX, 'a');
+        $ih = @fopen(TRACING2_ARCHIVE_INDEX, 'a');
         if ($ih && flock($ih, LOCK_EX)) {
             foreach (array_keys($newHashes) as $hash) fwrite($ih, $hash . "\n");
             flock($ih, LOCK_UN);

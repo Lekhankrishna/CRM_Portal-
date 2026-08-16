@@ -218,7 +218,7 @@ def run_tool_search(tool_slug, query):
     rc-print and hp-gas-advanced are special-cased to delegate straight to
     rc_print.py's run_rc_print()/hp_gas.py's run_hp_gas_single() - both
     already proven in production (their own dedicated pages/APIs used
-    these directly for weeks before being folded into Locate Me as tabs,
+    these directly for weeks before being folded into Tracing 2.0 as tabs,
     2026-08-17) - rather than routing them through this module's generic
     scraper, which has already been caught guessing wrong on other tools'
     exact markup. No reason to risk two tools that already work.

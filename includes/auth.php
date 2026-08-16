@@ -82,23 +82,24 @@ function requireLpgSearchAccess(string $loginPath = 'login.php'): void {
 
 // Same pattern as hasLpgSearchAccess() - checked fresh from the DB every
 // request so a revoke from Admin > Agents takes effect immediately. Defaults
-// to NOT granted (see migrate_add_locate_me_access.sql).
-function hasLocateMeAccess(): bool {
+// to NOT granted (see migrate_add_locate_me_access.sql - renamed to
+// tracing2_access by migrate_rename_locate_me_to_tracing2.sql).
+function hasTracing2Access(): bool {
     global $pdo;
     if (!isLoggedIn()) return false;
     static $access = null;
     if ($access !== null) return $access;
-    $stmt = $pdo->prepare('SELECT locate_me_access FROM users WHERE id = :id');
+    $stmt = $pdo->prepare('SELECT tracing2_access FROM users WHERE id = :id');
     $stmt->execute(['id' => $_SESSION['user_id']]);
     $access = (bool) $stmt->fetchColumn();
     return $access;
 }
 
-function requireLocateMeAccess(string $loginPath = 'login.php'): void {
+function requireTracing2Access(string $loginPath = 'login.php'): void {
     requireLogin($loginPath);
-    if (!hasLocateMeAccess()) {
+    if (!hasTracing2Access()) {
         http_response_code(403);
-        die('Access denied: Locate Me access has not been granted for this account.');
+        die('Access denied: Tracing 2.0 access has not been granted for this account.');
     }
 }
 
@@ -106,32 +107,32 @@ function requireLocateMeAccess(string $loginPath = 'login.php'): void {
 // migrate_add_locate_me_tools.sql). NULL means "never explicitly
 // configured" - distinct from a saved-but-empty array, which means an
 // admin actively unchecked every box. Returned as-is (null or array); see
-// hasLocateMeToolAccess() for how callers should interpret it.
-function getUserLocateMeTools(): ?array {
+// hasTracing2ToolAccess() for how callers should interpret it.
+function getUserTracing2Tools(): ?array {
     global $pdo;
     if (!isLoggedIn()) return [];
     static $tools = 'unset';
     if ($tools !== 'unset') return $tools;
-    $stmt = $pdo->prepare('SELECT locate_me_tools FROM users WHERE id = :id');
+    $stmt = $pdo->prepare('SELECT tracing2_tools FROM users WHERE id = :id');
     $stmt->execute(['id' => $_SESSION['user_id']]);
     $raw = $stmt->fetchColumn();
     $tools = ($raw === null || $raw === false) ? null : (json_decode((string) $raw, true) ?: []);
     return $tools;
 }
 
-// Gates an individual Locate Me tool (e.g. 'mobile-info', 'upi-finder') -
-// separate from hasLocateMeAccess(), which only gates the page as a whole.
+// Gates an individual Tracing 2.0 tool (e.g. 'mobile-info', 'upi-finder') -
+// separate from hasTracing2Access(), which only gates the page as a whole.
 // Admins bypass this (same as every other per-search quota/access check in
 // this app); a NULL tool list (never explicitly configured) defaults to
-// "every tool allowed" so the two accounts that already had
-// locate_me_access before this column existed don't lose access they
-// already had. rc-print/hp-gas-advanced are NOT covered by this - they
-// have their own hasRcPrintAccess()/hasHpGasAccess() checks instead (see
-// includes/locateme_tools.php's 'requiresAccess').
-function hasLocateMeToolAccess(string $toolSlug): bool {
-    if (!hasLocateMeAccess()) return false;
+// "every tool allowed" so the two accounts that already had this access
+// before the per-tool column existed don't lose access they already had.
+// rc-print/hp-gas-advanced are NOT covered by this - they have their own
+// hasRcPrintAccess()/hasHpGasAccess() checks instead (see
+// includes/tracing2_tools.php's 'requiresAccess').
+function hasTracing2ToolAccess(string $toolSlug): bool {
+    if (!hasTracing2Access()) return false;
     if (($_SESSION['role'] ?? '') === 'admin') return true;
-    $tools = getUserLocateMeTools();
+    $tools = getUserTracing2Tools();
     if ($tools === null) return true;
     return in_array($toolSlug, $tools, true);
 }

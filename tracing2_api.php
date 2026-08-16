@@ -1,15 +1,15 @@
 <?php
 // Server-side proxy between the browser and the locateme.services tool
 // automations, same shape as hp_gas_api.php/rc_print_api.php: runs
-// centrally via Gas/lpg_web's Flask service (the generic /api/locate-tool
-// route, backed by Gas/lpg_web/locate_tools.py), browser never talks to
+// centrally via Gas/lpg_web's Flask service (the generic /api/tracing2-tool
+// route, backed by Gas/lpg_web/tracing2_tools.py), browser never talks to
 // locateme.services or Flask directly, and the locateme.services login
 // lives in Gas/lpg_web/rc_print.py, not in this app's database.
 require __DIR__ . '/includes/auth.php';
-requireLocateMeAccess();
+requireTracing2Access();
 require_once __DIR__ . '/config/db.php';
-require_once __DIR__ . '/includes/locateme_archive.php';
-require_once __DIR__ . '/includes/locateme_tools.php';
+require_once __DIR__ . '/includes/tracing2_archive.php';
+require_once __DIR__ . '/includes/tracing2_tools.php';
 require_once __DIR__ . '/includes/rcprint_archive.php';
 
 header('Content-Type: application/json');
@@ -26,9 +26,9 @@ $data  = json_decode(file_get_contents('php://input'), true) ?: [];
 $tool  = (string) ($data['tool'] ?? '');
 $query = trim((string) ($data['query'] ?? ''));
 
-if (!isset(LOCATEME_TOOLS[$tool])) {
+if (!isset(TRACING2_TOOLS[$tool])) {
     http_response_code(400);
-    echo json_encode(['error' => 'Unknown Locate Me tool.']);
+    echo json_encode(['error' => 'Unknown Tracing 2.0 tool.']);
     exit;
 }
 
@@ -59,10 +59,10 @@ if ($tool === 'rc-print') {
 // rc-print and hp-gas-advanced keep their OWN pre-existing access flag,
 // monthly-limit column, and search_logs search_type (continuing the exact
 // same usage count agents already had before these were folded into
-// Locate Me as tabs) - see includes/locateme_tools.php's comment on why
-// they don't share locate_me_access/locate_me_monthly_limit like every
+// Tracing 2.0 as tabs) - see includes/tracing2_tools.php's comment on why
+// they don't share tracing2_access/tracing2_monthly_limit like every
 // other tool here.
-$requiresAccess = LOCATEME_TOOLS[$tool]['requiresAccess'] ?? null;
+$requiresAccess = TRACING2_TOOLS[$tool]['requiresAccess'] ?? null;
 
 switch ($requiresAccess) {
     case 'rc_print':
@@ -86,25 +86,25 @@ switch ($requiresAccess) {
         $limitLabel  = 'HP LPG Search';
         break;
     default:
-        // Per-tool checklist (Admin > Agents > "Locate Me" -> expandable
+        // Per-tool checklist (Admin > Agents > "Tracing 2.0" -> expandable
         // tool list, see migrate_add_locate_me_tools.sql) - on top of the
-        // page-level requireLocateMeAccess() check above, an agent can be
+        // page-level requireTracing2Access() check above, an agent can be
         // restricted to a subset of tools rather than all-or-nothing.
-        if (!hasLocateMeToolAccess($tool)) {
+        if (!hasTracing2ToolAccess($tool)) {
             http_response_code(403);
-            echo json_encode(['error' => LOCATEME_TOOLS[$tool]['label'] . ' access has not been granted for this account.']);
+            echo json_encode(['error' => TRACING2_TOOLS[$tool]['label'] . ' access has not been granted for this account.']);
             exit;
         }
-        $limitColumn = 'locate_me_monthly_limit';
-        $searchType  = 'locate_me';
-        $limitLabel  = 'Locate Me';
+        $limitColumn = 'tracing2_monthly_limit';
+        $searchType  = 'tracing2';
+        $limitLabel  = 'Tracing 2.0';
 }
 
 // Every tool spends real credits on the single shared locateme.services
 // account, so every agent is capped per calendar month (Admin > Agents) -
 // admins bypass this entirely, same as every other metered tool in this app.
 //
-// The generic Locate Me bucket (every tool except RC Print/HP Gas Advanced)
+// The generic Tracing 2.0 bucket (every tool except RC Print/HP Gas Advanced)
 // tracks the monthly limit as an actual CREDIT budget (2026-08-17) - a
 // cheap 1-credit search and an expensive 150-credit search used to count
 // identically against "N searches/month", which didn't reflect real
@@ -112,7 +112,7 @@ switch ($requiresAccess) {
 // instead - each is a single fixed-cost tool (150 credits every time), so
 // a search count there is already just a constant multiple of credits,
 // and their existing admin-facing "N/month" limits predate this change.
-$creditsSpent  = locateMeCreditsFor($tool);
+$creditsSpent  = tracing2CreditsFor($tool);
 $quotaIsCredits = ($requiresAccess === null);
 $quotaUnit      = $quotaIsCredits ? 'credits' : 'searches';
 $quotaSql = $quotaIsCredits
@@ -140,7 +140,7 @@ if (($_SESSION['role'] ?? '') !== 'admin') {
     }
 }
 
-$ch = curl_init(FLASK_BASE . '/api/locate-tool');
+$ch = curl_init(FLASK_BASE . '/api/tracing2-tool');
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 // Generous timeout - a fresh locateme.services login plus their own search,
 // same reasoning as hp_gas_api.php.
@@ -155,7 +155,7 @@ curl_close($ch);
 
 if ($response === false) {
     http_response_code(502);
-    echo json_encode(['error' => "Could not reach the Locate Me service: $err"]);
+    echo json_encode(['error' => "Could not reach the Tracing 2.0 service: $err"]);
     exit;
 }
 
@@ -182,7 +182,7 @@ if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decode
         )->execute([
             'uid' => $_SESSION['user_id'],
             'type' => $searchType,
-            'q' => LOCATEME_TOOLS[$tool]['label'] . ': ' . $query,
+            'q' => TRACING2_TOOLS[$tool]['label'] . ': ' . $query,
             'cnt' => $recordCount,
             'credits' => $creditsSpent,
             'ip' => substr($ip, 0, 45),
@@ -205,7 +205,7 @@ if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decode
     if ($tool === 'rc-print' && !empty($decoded['pdfDataUri'])) {
         archiveRcPrintResult($decoded['pdfDataUri'], $query, currentUser()['username'] ?? 'unknown');
     } elseif (!empty($decoded['found']) && !empty($decoded['records'])) {
-        archiveLocateMeResults($decoded['records'], currentUser()['username'] ?? 'unknown', LOCATEME_TOOLS[$tool]['label'] . ': ' . $query);
+        archiveTracing2Results($decoded['records'], currentUser()['username'] ?? 'unknown', TRACING2_TOOLS[$tool]['label'] . ': ' . $query);
     }
 }
 

@@ -1,24 +1,24 @@
 <?php
 require __DIR__ . '/includes/auth.php';
-requireLocateMeAccess(); // requireLogin() + a 403 for logged-in users without the "Locate Me Access" permission (Admin > Agents)
+requireTracing2Access(); // requireLogin() + a 403 for logged-in users without the "Tracing 2.0 Access" permission (Admin > Agents)
 require_once __DIR__ . '/config/db.php';
-require_once __DIR__ . '/includes/locateme_tools.php';
+require_once __DIR__ . '/includes/tracing2_tools.php';
 
 // Same quota-badge pattern as hp_gas.php/rc_print.php, but this badge
-// tracks the generic Locate Me bucket's actual CREDIT spend (2026-08-17),
-// not a search count - see locate_me_api.php's own comment on why. RC
+// tracks the generic Tracing 2.0 bucket's actual CREDIT spend (2026-08-17),
+// not a search count - see tracing2_api.php's own comment on why. RC
 // Print/HP Gas Advanced's tabs still spend against their own separate,
 // count-based quotas (checked server-side per search, same as before);
 // this page-level badge only ever reflects the generic bucket.
 $isAdmin = ($_SESSION['role'] ?? '') === 'admin';
 $quota = null;
 if (!$isAdmin) {
-    $stmt = $pdo->prepare('SELECT locate_me_monthly_limit FROM users WHERE id = :id');
+    $stmt = $pdo->prepare('SELECT tracing2_monthly_limit FROM users WHERE id = :id');
     $stmt->execute(['id' => $_SESSION['user_id']]);
     $monthlyLimit = (int) $stmt->fetchColumn();
 
     $stmt = $pdo->prepare(
-        "SELECT COALESCE(SUM(credits_spent), 0) FROM search_logs WHERE user_id = :id AND search_type = 'locate_me' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+        "SELECT COALESCE(SUM(credits_spent), 0) FROM search_logs WHERE user_id = :id AND search_type = 'tracing2' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
     );
     $stmt->execute(['id' => $_SESSION['user_id']]);
     $usedThisMonth = (int) $stmt->fetchColumn();
@@ -35,11 +35,11 @@ require __DIR__ . '/includes/header.php';
 <div class="confetti-container" id="confetti-container"></div>
 
 <div class="page-header" style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
-  <h1 class="page-title" style="margin:0"><i class="bi bi-geo-alt-fill"></i> Locate Me</h1>
+  <h1 class="page-title" style="margin:0"><i class="bi bi-geo-alt-fill"></i> Tracing 2.0</h1>
   <?php if ($isAdmin): ?>
-    <span id="lmQuotaBadge" class="badge badge-neutral" style="margin-left:auto">Unlimited (Admin)</span>
+    <span id="t2QuotaBadge" class="badge badge-neutral" style="margin-left:auto">Unlimited (Admin)</span>
   <?php elseif ($quota !== null): ?>
-    <span id="lmQuotaBadge" class="badge <?= $quota['used'] >= $quota['limit'] ? 'badge-danger' : 'badge-neutral' ?>"
+    <span id="t2QuotaBadge" class="badge <?= $quota['used'] >= $quota['limit'] ? 'badge-danger' : 'badge-neutral' ?>"
           style="margin-left:auto">
       <?= $quota['limit'] - $quota['used'] > 0 ? $quota['limit'] - $quota['used'] : 0 ?> of <?= $quota['limit'] ?> credits left this month
     </span>
@@ -48,75 +48,75 @@ require __DIR__ . '/includes/header.php';
 
 <style>
   /* Same tokens/shape as hp_gas.php/rc_print.php's cards. */
-  .lm-card{background:var(--c-surface,#fff);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;}
-  .lm-card-body{padding:16px 18px;}
-  .lm-hint{color:#999;margin:0 0 14px;font-size:13px;}
-  .lm-row{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap;}
-  .lm-btn{padding:11px 26px;border-radius:9px;border:none;background:#4f46e5;color:#fff;
+  .t2-card{background:var(--c-surface,#fff);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;}
+  .t2-card-body{padding:16px 18px;}
+  .t2-hint{color:#999;margin:0 0 14px;font-size:13px;}
+  .t2-row{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap;}
+  .t2-btn{padding:11px 26px;border-radius:9px;border:none;background:#4f46e5;color:#fff;
     font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;
     transition:all 150ms;box-shadow:0 4px 18px rgba(79,70,229,.3);}
-  .lm-btn:hover:not(:disabled){background:#4338ca;transform:translateY(-1px);box-shadow:0 6px 20px rgba(79,70,229,.45);}
-  .lm-btn:disabled{opacity:.65;cursor:wait;transform:none;}
-  .lm-btn-secondary{background:#fff;color:#333;border:1px solid #e0e0e0;box-shadow:none;}
-  .lm-btn-secondary:hover:not(:disabled){background:#eeeef6;border-color:#4f46e5;transform:none;box-shadow:none;}
-  #lmStatus{font-size:12.5px;color:#555;white-space:pre-wrap;word-break:break-word;font-weight:500;}
-  .lm-progress-wrap{margin-top:12px;display:none;}
-  .lm-progress-track{height:8px;border-radius:6px;background:#eeeef6;overflow:hidden;border:1px solid #e0e0e0;}
-  .lm-progress-fill{height:100%;border-radius:6px;background:#4f46e5;width:100%;
+  .t2-btn:hover:not(:disabled){background:#4338ca;transform:translateY(-1px);box-shadow:0 6px 20px rgba(79,70,229,.45);}
+  .t2-btn:disabled{opacity:.65;cursor:wait;transform:none;}
+  .t2-btn-secondary{background:#fff;color:#333;border:1px solid #e0e0e0;box-shadow:none;}
+  .t2-btn-secondary:hover:not(:disabled){background:#eeeef6;border-color:#4f46e5;transform:none;box-shadow:none;}
+  #t2Status{font-size:12.5px;color:#555;white-space:pre-wrap;word-break:break-word;font-weight:500;}
+  .t2-progress-wrap{margin-top:12px;display:none;}
+  .t2-progress-track{height:8px;border-radius:6px;background:#eeeef6;overflow:hidden;border:1px solid #e0e0e0;}
+  .t2-progress-fill{height:100%;border-radius:6px;background:#4f46e5;width:100%;
     background-image:repeating-linear-gradient(45deg,#4f46e5 0 12px,#4338ca 12px 24px);
-    background-size:34px 100%;animation:lm-progress-stripes 1s linear infinite;}
-  @keyframes lm-progress-stripes{from{background-position:0 0;}to{background-position:-34px 0;}}
-  .lm-progress-meta{display:flex;justify-content:space-between;margin-top:6px;font-size:11.5px;color:#999;}
+    background-size:34px 100%;animation:t2-progress-stripes 1s linear infinite;}
+  @keyframes t2-progress-stripes{from{background-position:0 0;}to{background-position:-34px 0;}}
+  .t2-progress-meta{display:flex;justify-content:space-between;margin-top:6px;font-size:11.5px;color:#999;}
   /* Results - one card per record/section (name+icon header, optional
      status badge, then a 2-column grid of icon+label+value fields) -
      same general shape as locateme.services' own result page, light
      card tokens matching hp_gas.php/rc_print.php's cards elsewhere in
      this app rather than that site's dark theme. */
-  .lm-result-wrap{margin-top:16px;display:none;}
-  .lm-result-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
-  .lm-result-count{font-size:12px;color:#777;font-weight:600;}
-  .lm-export-btn{background:#10b981;color:#fff;border:none;box-shadow:0 4px 18px rgba(16,185,129,.3);padding:9px 18px;
+  .t2-result-wrap{margin-top:16px;display:none;}
+  .t2-result-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .t2-result-count{font-size:12px;color:#777;font-weight:600;}
+  .t2-export-btn{background:#10b981;color:#fff;border:none;box-shadow:0 4px 18px rgba(16,185,129,.3);padding:9px 18px;
     border-radius:9px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;
     display:inline-flex;align-items:center;gap:8px;transition:all 150ms;}
-  .lm-export-btn:hover:not(:disabled){background:#0d9668;transform:translateY(-1px);box-shadow:0 6px 20px rgba(16,185,129,.45);}
-  .lm-export-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none;}
-  .lm-record{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;margin-bottom:14px;}
-  .lm-record-header{padding:12px 16px;background:#4f46e5;color:#fff;display:flex;align-items:center;gap:10px;}
-  .lm-record-header i{font-size:16px;}
-  .lm-record-name{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;}
-  .lm-record-status{margin-left:auto;font-size:10.5px;padding:2px 10px;border-radius:999px;
+  .t2-export-btn:hover:not(:disabled){background:#0d9668;transform:translateY(-1px);box-shadow:0 6px 20px rgba(16,185,129,.45);}
+  .t2-export-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none;}
+  .t2-record{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;margin-bottom:14px;}
+  .t2-record-header{padding:12px 16px;background:#4f46e5;color:#fff;display:flex;align-items:center;gap:10px;}
+  .t2-record-header i{font-size:16px;}
+  .t2-record-name{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;}
+  .t2-record-status{margin-left:auto;font-size:10.5px;padding:2px 10px;border-radius:999px;
     font-weight:700;text-transform:uppercase;letter-spacing:.3px;background:rgba(255,255,255,.2);}
-  .lm-field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;padding:16px;}
-  .lm-field-item{display:flex;align-items:flex-start;gap:10px;}
-  .lm-field-item i{font-size:15px;color:#4f46e5;margin-top:2px;flex-shrink:0;}
-  .lm-field-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#999;margin-bottom:2px;}
-  .lm-field-value{font-size:13px;font-weight:600;color:#222;word-break:break-word;}
-  .lm-raw-body{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:16px;
+  .t2-field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;padding:16px;}
+  .t2-field-item{display:flex;align-items:flex-start;gap:10px;}
+  .t2-field-item i{font-size:15px;color:#4f46e5;margin-top:2px;flex-shrink:0;}
+  .t2-field-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#999;margin-bottom:2px;}
+  .t2-field-value{font-size:13px;font-weight:600;color:#222;word-break:break-word;}
+  .t2-raw-body{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:16px;
     font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;color:#333;margin-top:16px;display:none;}
-  .lm-no-results{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  .t2-no-results{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
     padding:56px 16px;color:#999;margin-top:16px;}
-  .lm-no-results i{font-size:38px;color:#ccc;width:74px;height:74px;display:flex;align-items:center;justify-content:center;
+  .t2-no-results i{font-size:38px;color:#ccc;width:74px;height:74px;display:flex;align-items:center;justify-content:center;
     border-radius:50%;border:1.5px solid #e5e5e5;}
-  .lm-no-results span{font-size:14px;color:#888;}
+  .t2-no-results span{font-size:14px;color:#888;}
   /* Tool picker - same tab-pill look as advanced_search.php's .as-tabs/.as-tab,
-     just renamed with this page's own lm- prefix. Wraps onto multiple lines
-     for Locate Me's 24 tools instead of advanced_search.php's 5 modes, same
+     just renamed with this page's own t2- prefix. Wraps onto multiple lines
+     for Tracing 2.0's 24 tools instead of advanced_search.php's 5 modes, same
      as that page's row already supports via flex-wrap. */
-  .lm-tabs{display:flex;gap:10px;flex-wrap:wrap;padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid #eee;}
-  .lm-tab{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:10px;
+  .t2-tabs{display:flex;gap:10px;flex-wrap:wrap;padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid #eee;}
+  .t2-tab{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:10px;
     border:1px solid #e2e2ea;background:#fff;font-size:12.5px;font-weight:600;color:#555;
     cursor:pointer;transition:all 150ms;white-space:nowrap;}
-  .lm-tab:hover{border-color:#4f46e5;color:#4f46e5;}
-  .lm-tab.active{background:#4f46e5;border-color:#4f46e5;color:#fff;box-shadow:0 4px 14px rgba(79,70,229,.35);}
+  .t2-tab:hover{border-color:#4f46e5;color:#4f46e5;}
+  .t2-tab.active{background:#4f46e5;border-color:#4f46e5;color:#fff;box-shadow:0 4px 14px rgba(79,70,229,.35);}
   /* RC Print's result is a PDF, not label/value fields - same iframe
      preview + download pattern as the old standalone rc_print.php. */
-  .lm-pdf-wrap{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-top:16px;overflow:hidden;display:none;}
-  .lm-pdf-frame{width:100%;height:80vh;border:none;display:block;}
+  .t2-pdf-wrap{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-top:16px;overflow:hidden;display:none;}
+  .t2-pdf-frame{width:100%;height:80vh;border:none;display:block;}
 </style>
 
-<div class="lm-card">
-  <div class="lm-card-body">
-    <p class="lm-hint">Pick a tool, then enter the matching value to search locateme.services' database.</p>
+<div class="t2-card">
+  <div class="t2-card-body">
+    <p class="t2-hint">Pick a tool, then enter the matching value to search.</p>
     <?php
     // Restricting an agent to a subset of tools (per-tool checklist below)
     // can mean mobile-info itself isn't in their allowed list - the first
@@ -126,86 +126,86 @@ require __DIR__ . '/includes/header.php';
     // sync with whichever tab is visually marked active.
     $firstVisibleTool = null;
     ?>
-    <div class="lm-tabs" id="lmToolTabs" role="tablist">
-      <?php foreach (LOCATEME_TOOLS as $slug => $toolDef):
+    <div class="t2-tabs" id="t2ToolTabs" role="tablist">
+      <?php foreach (TRACING2_TOOLS as $slug => $toolDef):
         // RC Print/HP Gas Advanced only show up here for agents who already
         // have that specific access; every other tool is gated by the
-        // per-tool checklist (Admin > Agents > "Locate Me") - see
-        // includes/locateme_tools.php and hasLocateMeToolAccess().
+        // per-tool checklist (Admin > Agents > "Tracing 2.0") - see
+        // includes/tracing2_tools.php and hasTracing2ToolAccess().
         $requires = $toolDef['requiresAccess'] ?? null;
         if ($requires === 'rc_print' && !hasRcPrintAccess()) continue;
         if ($requires === 'hp_gas' && !hasHpGasAccess()) continue;
-        if ($requires === null && !hasLocateMeToolAccess($slug)) continue;
+        if ($requires === null && !hasTracing2ToolAccess($slug)) continue;
         if ($firstVisibleTool === null) $firstVisibleTool = ['slug' => $slug, 'placeholder' => $toolDef['placeholder']];
       ?>
-        <button type="button" class="lm-tab<?= $slug === $firstVisibleTool['slug'] ? ' active' : '' ?>"
+        <button type="button" class="t2-tab<?= $slug === $firstVisibleTool['slug'] ? ' active' : '' ?>"
                 data-tool="<?= htmlspecialchars($slug) ?>" data-placeholder="<?= htmlspecialchars($toolDef['placeholder']) ?>">
           <?= htmlspecialchars($toolDef['label']) ?>
         </button>
       <?php endforeach; ?>
     </div>
-    <input type="text" id="lmQueryBox" placeholder="<?= htmlspecialchars($firstVisibleTool['placeholder'] ?? '') ?>" maxlength="100"
+    <input type="text" id="t2QueryBox" placeholder="<?= htmlspecialchars($firstVisibleTool['placeholder'] ?? '') ?>" maxlength="100"
            style="width:100%;padding:11px 16px;font-size:13px;color:#333;border:1px solid #e0e0e0;border-radius:9px;background:#fff;outline:none;">
-    <div class="lm-row">
-      <button id="lmSearchBtn" class="lm-btn">Search</button>
-      <button id="lmClearBtn" class="lm-btn lm-btn-secondary" type="button">Clear</button>
-      <span id="lmStatus"></span>
+    <div class="t2-row">
+      <button id="t2SearchBtn" class="t2-btn">Search</button>
+      <button id="t2ClearBtn" class="t2-btn t2-btn-secondary" type="button">Clear</button>
+      <span id="t2Status"></span>
     </div>
-    <div class="lm-progress-wrap" id="lmProgressWrap">
-      <div class="lm-progress-track"><div class="lm-progress-fill" id="lmProgressFill"></div></div>
-      <div class="lm-progress-meta">
-        <span id="lmProgressLabel">Logging in and running the search…</span>
-        <span id="lmProgressElapsed"></span>
+    <div class="t2-progress-wrap" id="t2ProgressWrap">
+      <div class="t2-progress-track"><div class="t2-progress-fill" id="t2ProgressFill"></div></div>
+      <div class="t2-progress-meta">
+        <span id="t2ProgressLabel">Logging in and running the search…</span>
+        <span id="t2ProgressElapsed"></span>
       </div>
     </div>
   </div>
 </div>
 
-<div class="lm-result-wrap" id="lmResultWrap">
-  <div class="lm-result-toolbar">
-    <span class="lm-result-count" id="lmResultCountText"></span>
-    <button id="lmExportBtn" class="lm-export-btn" type="button" disabled>
+<div class="t2-result-wrap" id="t2ResultWrap">
+  <div class="t2-result-toolbar">
+    <span class="t2-result-count" id="t2ResultCountText"></span>
+    <button id="t2ExportBtn" class="t2-export-btn" type="button" disabled>
       <i class="bi bi-file-earmark-excel"></i> Export as Excel (CSV)
     </button>
   </div>
-  <div id="lmRecordsWrap"></div>
+  <div id="t2RecordsWrap"></div>
 </div>
-<div class="lm-raw-body" id="lmRawBody"></div>
-<div class="lm-pdf-wrap" id="lmPdfWrap">
-  <div class="lm-result-toolbar">
-    <span class="lm-result-count" id="lmPdfCountText"></span>
-    <button id="lmPdfDownloadBtn" class="lm-export-btn" type="button">
+<div class="t2-raw-body" id="t2RawBody"></div>
+<div class="t2-pdf-wrap" id="t2PdfWrap">
+  <div class="t2-result-toolbar">
+    <span class="t2-result-count" id="t2PdfCountText"></span>
+    <button id="t2PdfDownloadBtn" class="t2-export-btn" type="button">
       <i class="bi bi-download"></i> Download PDF
     </button>
   </div>
-  <iframe class="lm-pdf-frame" id="lmPdfFrame" title="RC PDF Preview"></iframe>
+  <iframe class="t2-pdf-frame" id="t2PdfFrame" title="RC PDF Preview"></iframe>
 </div>
-<div class="lm-no-results" id="lmNoResults" style="display:none">
+<div class="t2-no-results" id="t2NoResults" style="display:none">
   <i class="bi bi-search"></i>
   <span>No records found</span>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
-const searchBtn      = document.getElementById("lmSearchBtn");
-const clearBtn       = document.getElementById("lmClearBtn");
-const toolTabs       = document.getElementById("lmToolTabs");
-const queryBox       = document.getElementById("lmQueryBox");
-const statusEl       = document.getElementById("lmStatus");
-const resultWrap     = document.getElementById("lmResultWrap");
-const resultCountText= document.getElementById("lmResultCountText");
-const exportBtn      = document.getElementById("lmExportBtn");
-const recordsWrap    = document.getElementById("lmRecordsWrap");
-const rawBody        = document.getElementById("lmRawBody");
-const pdfWrap        = document.getElementById("lmPdfWrap");
-const pdfFrame       = document.getElementById("lmPdfFrame");
-const pdfCountText   = document.getElementById("lmPdfCountText");
-const pdfDownloadBtn = document.getElementById("lmPdfDownloadBtn");
-const noResultsEl    = document.getElementById("lmNoResults");
-const quotaBadge     = document.getElementById("lmQuotaBadge");
-const progressWrap   = document.getElementById("lmProgressWrap");
-const progressLabel  = document.getElementById("lmProgressLabel");
-const progressElapsed= document.getElementById("lmProgressElapsed");
+const searchBtn      = document.getElementById("t2SearchBtn");
+const clearBtn       = document.getElementById("t2ClearBtn");
+const toolTabs       = document.getElementById("t2ToolTabs");
+const queryBox       = document.getElementById("t2QueryBox");
+const statusEl       = document.getElementById("t2Status");
+const resultWrap     = document.getElementById("t2ResultWrap");
+const resultCountText= document.getElementById("t2ResultCountText");
+const exportBtn      = document.getElementById("t2ExportBtn");
+const recordsWrap    = document.getElementById("t2RecordsWrap");
+const rawBody        = document.getElementById("t2RawBody");
+const pdfWrap        = document.getElementById("t2PdfWrap");
+const pdfFrame       = document.getElementById("t2PdfFrame");
+const pdfCountText   = document.getElementById("t2PdfCountText");
+const pdfDownloadBtn = document.getElementById("t2PdfDownloadBtn");
+const noResultsEl    = document.getElementById("t2NoResults");
+const quotaBadge     = document.getElementById("t2QuotaBadge");
+const progressWrap   = document.getElementById("t2ProgressWrap");
+const progressLabel  = document.getElementById("t2ProgressLabel");
+const progressElapsed= document.getElementById("t2ProgressElapsed");
 
 let progressTimer = null;
 let searchStartedAt = null;
@@ -220,11 +220,11 @@ function formatDuration(seconds) {
 // Tab picker - same active-tab pattern as advanced_search.php's .as-tabs.
 // Placeholder swaps to match whatever the selected tool actually expects
 // (mobile number, Aadhaar number, vehicle number, email, IFSC code, ...) -
-// see includes/locateme_tools.php for the full list, mirrored server-side
-// in Gas/lpg_web/locate_tools.py's TOOL_REGISTRY.
+// see includes/tracing2_tools.php for the full list, mirrored server-side
+// in Gas/lpg_web/tracing2_tools.py's TOOL_REGISTRY.
 let activeTool = "<?= htmlspecialchars($firstVisibleTool['slug'] ?? '', ENT_QUOTES) ?>";
-toolTabs.querySelectorAll(".lm-tab").forEach(tab => tab.addEventListener("click", () => {
-  toolTabs.querySelectorAll(".lm-tab").forEach(t => t.classList.remove("active"));
+toolTabs.querySelectorAll(".t2-tab").forEach(tab => tab.addEventListener("click", () => {
+  toolTabs.querySelectorAll(".t2-tab").forEach(t => t.classList.remove("active"));
   tab.classList.add("active");
   activeTool = tab.dataset.tool;
   queryBox.placeholder = tab.dataset.placeholder;
@@ -233,7 +233,7 @@ toolTabs.querySelectorAll(".lm-tab").forEach(tab => tab.addEventListener("click"
 
 // There's no per-step progress to report here (unlike LPG's job-based
 // polling) - this is one blocking fetch for the whole login+search+scrape
-// sequence in Gas/lpg_web/locate_tools.py, so the bar itself is always
+// sequence in Gas/lpg_web/tracing2_tools.py, so the bar itself is always
 // indeterminate (striped, animating). The countdown is a fixed estimate,
 // same idea as hp_gas.php's own "~Xs remaining".
 const ESTIMATED_SECONDS = 20;
@@ -264,7 +264,7 @@ function stopProgress(finalLabel) {
 
 // unit is "credits" for every tool except RC Print/HP Gas Advanced, which
 // still spend against their own separate, count-based quotas ("searches")
-// - see locate_me_api.php's own comment on why those two stayed count-based.
+// - see tracing2_api.php's own comment on why those two stayed count-based.
 function updateQuotaBadge(used, limit, unit) {
   if (!quotaBadge) return;
   const remaining = Math.max(0, limit - used);
@@ -290,9 +290,9 @@ function fieldIcon(label) {
   return "bi-info-circle-fill";
 }
 
-// Records come from Gas/lpg_web/locate_tools.py scraping locateme.services'
+// Records come from Gas/lpg_web/tracing2_tools.py scraping locateme.services'
 // own result cards generically (label/value field pairs under a
-// name+status header, or under a section title - see locate_tools.py) -
+// name+status header, or under a section title - see tracing2_tools.py) -
 // rendered as-is here rather than assuming fixed field names, since
 // whatever fields locateme.services shows for a given query is what gets
 // displayed. Some queries (e.g. a mobile number that's changed hands/been
@@ -300,26 +300,26 @@ function fieldIcon(label) {
 // than one record - each gets its own card.
 function buildRecordCard(record) {
   const box = document.createElement("div");
-  box.className = "lm-record";
+  box.className = "t2-record";
 
   const header = document.createElement("div");
-  header.className = "lm-record-header";
+  header.className = "t2-record-header";
   const headerIcon = record.status ? "bi-person-circle" : "bi-folder2-open";
-  header.innerHTML = `<i class="bi ${headerIcon}"></i><span class="lm-record-name"></span><span class="lm-record-status"></span>`;
-  header.querySelector(".lm-record-name").textContent = record.name || "Record";
-  const statusBadge = header.querySelector(".lm-record-status");
+  header.innerHTML = `<i class="bi ${headerIcon}"></i><span class="t2-record-name"></span><span class="t2-record-status"></span>`;
+  header.querySelector(".t2-record-name").textContent = record.name || "Record";
+  const statusBadge = header.querySelector(".t2-record-status");
   if (record.status) { statusBadge.textContent = record.status; } else { statusBadge.remove(); }
   box.appendChild(header);
 
   const grid = document.createElement("div");
-  grid.className = "lm-field-grid";
+  grid.className = "t2-field-grid";
   (record.fields || []).forEach(field => {
     const item = document.createElement("div");
-    item.className = "lm-field-item";
-    item.innerHTML = `<i class="bi"></i><div><div class="lm-field-label"></div><div class="lm-field-value"></div></div>`;
+    item.className = "t2-field-item";
+    item.innerHTML = `<i class="bi"></i><div><div class="t2-field-label"></div><div class="t2-field-value"></div></div>`;
     item.querySelector("i").classList.add(fieldIcon(field.label));
-    item.querySelector(".lm-field-label").textContent = field.label;
-    item.querySelector(".lm-field-value").textContent = field.value || "—";
+    item.querySelector(".t2-field-label").textContent = field.label;
+    item.querySelector(".t2-field-value").textContent = field.value || "—";
     grid.appendChild(item);
   });
   box.appendChild(grid);
@@ -365,7 +365,7 @@ function renderResult(data) {
     // Fallback if locateme.services' DOM structure matches neither
     // extraction pattern for this particular tool (e.g. whatsapp-dp, which
     // returns an image rather than label/value fields) - see
-    // locate_tools.py's module docstring.
+    // tracing2_tools.py's module docstring.
     rawBody.textContent = data.rawText;
     rawBody.style.display = "block";
   } else {
@@ -405,7 +405,7 @@ exportBtn.addEventListener("click", () => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Result");
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-  XLSX.writeFile(wb, `locate-me-${activeTool}-${stamp}.xlsx`);
+  XLSX.writeFile(wb, `tracing2-${activeTool}-${stamp}.xlsx`);
 });
 
 pdfDownloadBtn.addEventListener("click", () => {
@@ -435,7 +435,7 @@ async function runSearch() {
   startProgress();
 
   try {
-    const res = await fetch("locate_me_api.php", {
+    const res = await fetch("tracing2_api.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tool, query })

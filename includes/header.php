@@ -27,22 +27,23 @@ $searchRegionsExtra = [
 if (hasAdvancedSearchAccess()) {
     array_unshift($searchRegionsExtra, ['label' => 'Advanced Search', 'href' => 'advanced_search.php']);
 }
-// Locate Me is opt-in per account (Admin > Agents > "Locate Me Access") -
-// drives every locateme.services tool (Mobile Info, Vehicle Intelligence,
-// UPI Finder, etc. - see includes/locateme_tools.php) as tabs on one page,
-// via Gas/lpg_web/locate_tools.py's generic scraper. RC Print and HP Gas
-// Advanced (2026-08-17) are folded in here as tabs too, replacing their
-// own former standalone sidebar entries below - each still gated by its
-// own pre-existing access flag (hasRcPrintAccess()/hasHpGasAccess()),
-// checked inside locate_me.php itself for tab visibility rather than here,
-// since they're not separate nav items anymore. Placed directly under
-// Advanced Search per explicit instruction - inserted at index 1 so it
-// lands right after Advanced Search regardless of whether Advanced Search
-// itself was unshifted above (index 0) or this account doesn't have that
-// access (in which case it simply becomes the new first item).
-if (hasLocateMeAccess()) {
-    $locateMeIndex = hasAdvancedSearchAccess() ? 1 : 0;
-    array_splice($searchRegionsExtra, $locateMeIndex, 0, [['label' => 'Locate Me', 'href' => 'locate_me.php']]);
+// Tracing 2.0 is opt-in per account (Admin > Agents > "Tracing 2.0
+// Access") - drives every locateme.services tool (Mobile Info, Vehicle
+// Intelligence, UPI Finder, etc. - see includes/tracing2_tools.php) as
+// tabs on one page, via Gas/lpg_web/tracing2_tools.py's generic scraper.
+// RC Print and HP Gas Advanced (2026-08-17) are folded in here as tabs
+// too, replacing their own former standalone sidebar entries below - each
+// still gated by its own pre-existing access flag
+// (hasRcPrintAccess()/hasHpGasAccess()), checked inside tracing2.php
+// itself for tab visibility rather than here, since they're not separate
+// nav items anymore. Placed directly under Advanced Search per explicit
+// instruction - inserted at index 1 so it lands right after Advanced
+// Search regardless of whether Advanced Search itself was unshifted above
+// (index 0) or this account doesn't have that access (in which case it
+// simply becomes the new first item).
+if (hasTracing2Access()) {
+    $tracing2Index = hasAdvancedSearchAccess() ? 1 : 0;
+    array_splice($searchRegionsExtra, $tracing2Index, 0, [['label' => 'Tracing 2.0', 'href' => 'tracing2.php']]);
 }
 // Pan India is opt-in per account (Admin > Agents > "Pan India Access"),
 // same as LPG Search below (2026-08-19 - previously unconditional for every

@@ -1,30 +1,30 @@
 <?php
-// Shared tool registry for Locate Me (locateme.services) - mirrors
-// Gas/lpg_web/locate_tools.py's TOOL_REGISTRY (label + input placeholder +
-// credit cost), used by locate_me.php (tool picker UI), locate_me_api.php
+// Shared tool registry for Tracing 2.0 (locateme.services) - mirrors
+// Gas/lpg_web/tracing2_tools.py's TOOL_REGISTRY (label + input placeholder +
+// credit cost), used by tracing2.php (tool picker UI), tracing2_api.php
 // (server-side allowlist), and admin/agents.php (per-tool access
 // checklist) so all three can never drift out of sync with each other.
 // whatsapp-dp is a known exception - it returns an image, not label/value
 // fields, so it's left in for completeness but its result will just show
-// as raw page text (see locate_tools.py's module docstring).
+// as raw page text (see tracing2_tools.py's module docstring).
 //
 // rc-print and hp-gas-advanced (2026-08-17, per explicit instruction) are
 // folded in here as tabs too, replacing the standalone RC Print/HP LPG
 // Search sidebar pages - but each keeps its OWN pre-existing access flag
 // and monthly-limit quota ('requiresAccess' below), rather than falling
-// under locate_me_access's quota. Both were already separately granted per
+// under tracing2_access's quota. Both were already separately granted per
 // agent (Admin > Agents > "RC Print"/"HP LPG Search") before this change,
 // and both spend far more credits per search (150 each) than a typical
-// Locate Me tool - folding them into the shared locate_me_monthly_limit
+// Tracing 2.0 tool - folding them into the shared tracing2_monthly_limit
 // would either strip existing agents of access they already have, or let
-// every Locate Me user suddenly burn through RC Print/HP Gas's expensive
-// per-search budget. locate_me.php only shows these two tabs to agents who
-// already have the specific matching access; locate_me_api.php enforces
+// every Tracing 2.0 user suddenly burn through RC Print/HP Gas's expensive
+// per-search budget. tracing2.php only shows these two tabs to agents who
+// already have the specific matching access; tracing2_api.php enforces
 // the same specific access + quota server-side, same as their old
-// standalone pages did. locateMeSelectableTools() below excludes both from
+// standalone pages did. tracing2SelectableTools() below excludes both from
 // the per-tool checklist for the same reason - they're managed by their
 // own existing checkboxes in Admin > Agents, not this new one.
-const LOCATEME_TOOLS = [
+const TRACING2_TOOLS = [
     'mobile-info'             => ['label' => 'Mobile Info',            'placeholder' => 'Enter Mobile Number',   'credits' => 100],
     'rc-print'                => ['label' => 'RC PRINT',               'placeholder' => 'Enter Vehicle Number',  'credits' => 150, 'requiresAccess' => 'rc_print'],
     'hp-gas-advanced'         => ['label' => 'HP Gas Advanced',        'placeholder' => 'Enter Mobile Number',   'credits' => 150, 'requiresAccess' => 'hp_gas'],
@@ -54,24 +54,24 @@ const LOCATEME_TOOLS = [
 ];
 
 // The subset Admin > Agents' per-tool checklist actually offers - every
-// LOCATEME_TOOLS entry except rc-print/hp-gas-advanced (see the const's own
+// TRACING2_TOOLS entry except rc-print/hp-gas-advanced (see the const's own
 // comment on why those two are excluded).
-function locateMeSelectableTools(): array {
-    return array_filter(LOCATEME_TOOLS, fn($t) => !isset($t['requiresAccess']));
+function tracing2SelectableTools(): array {
+    return array_filter(TRACING2_TOOLS, fn($t) => !isset($t['requiresAccess']));
 }
 
 // A handful of tools have never actually been searched live, so their real
 // locateme.services cost is unconfirmed (credits => null above - see each
-// one's discovery note in Gas/lpg_web/locate_tools.py's TOOL_REGISTRY).
-// locate_me_api.php's credit-budget quota (2026-08-17) still needs SOME
+// one's discovery note in Gas/lpg_web/tracing2_tools.py's TOOL_REGISTRY).
+// tracing2_api.php's credit-budget quota (2026-08-17) still needs SOME
 // number to charge against the monthly limit for these, rather than
 // treating them as free - a mid-range placeholder, roughly the average of
 // the confirmed costs (1-150), errs toward not undercharging. Update the
 // registry's real 'credits' value directly once a tool's actual cost is
 // observed from a real search, same as every already-confirmed entry was.
-const LOCATEME_UNKNOWN_COST_CREDITS = 30;
+const TRACING2_UNKNOWN_COST_CREDITS = 30;
 
-function locateMeCreditsFor(string $toolSlug): int {
-    $credits = LOCATEME_TOOLS[$toolSlug]['credits'] ?? null;
-    return $credits ?? LOCATEME_UNKNOWN_COST_CREDITS;
+function tracing2CreditsFor(string $toolSlug): int {
+    $credits = TRACING2_TOOLS[$toolSlug]['credits'] ?? null;
+    return $credits ?? TRACING2_UNKNOWN_COST_CREDITS;
 }

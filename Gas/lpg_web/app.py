@@ -9,7 +9,7 @@ from lpg_search import run_bulk_search
 from rc_print import run_rc_print
 from hp_gas import run_hp_gas_single
 from tataplay import run_tataplay_single
-from locate_tools import run_tool_search, TOOL_REGISTRY
+from tracing2_tools import run_tool_search, TOOL_REGISTRY
 
 app = Flask(__name__)
 
@@ -293,8 +293,8 @@ def tataplay():
     return jsonify(result)
 
 
-@app.route("/api/locate-tool", methods=["POST"])
-def locate_tool():
+@app.route("/api/tracing2-tool", methods=["POST"])
+def tracing2_tool():
     data = request.get_json(silent=True) or {}
     tool_slug = str(data.get("toolSlug", "")).strip()
     query = str(data.get("query", "")).strip()
@@ -311,7 +311,7 @@ def locate_tool():
             result = run_tool_search(tool_slug, query)
         except Exception as e:
             full_trace = traceback.format_exc()
-            print(f"[locate-tool {tool_slug} {query}] FAILED:\n{full_trace}")
+            print(f"[tracing2-tool {tool_slug} {query}] FAILED:\n{full_trace}")
             return jsonify({"error": clean_error_message(e)}), 502
 
     return jsonify(result)
