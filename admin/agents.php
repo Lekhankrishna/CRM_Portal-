@@ -326,13 +326,14 @@ require __DIR__ . '/../includes/header.php';
   .acf-locate-tools.open{display:block;}
   .acf-locate-tools-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
     color:var(--c-accent-hover);margin-bottom:8px;}
-  .acf-tools-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;}
-  .acf-tool-check{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--c-text);
-    cursor:pointer;padding:4px 6px;border-radius:6px;}
+  .acf-tools-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 10px;}
+  .acf-tool-check{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--c-text);
+    cursor:pointer;padding:5px 8px;border-radius:6px;}
   .acf-tool-check:hover{background:var(--c-surface);}
   .acf-tool-check input{width:14px;height:14px;flex-shrink:0;accent-color:var(--c-accent);cursor:pointer;}
-  .acf-tool-check span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .acf-tool-credits{flex:0 0 auto;font-size:10px;color:var(--c-text-soft);font-weight:600;white-space:nowrap;}
+  .acf-tool-check span{flex:1;white-space:normal;line-height:1.3;word-break:break-word;}
+  .acf-tool-credits{flex:0 0 auto;font-size:10.5px;color:var(--c-accent-hover);font-weight:700;
+    white-space:nowrap;background:var(--c-surface);padding:1px 7px;border-radius:999px;border:1px solid var(--c-border);}
 
   /* Edit modal widened (2026-08-08, widened further same day) - the shared
      .modal-box max-width (420px, used by every modal in the app) left
