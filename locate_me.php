@@ -2,6 +2,7 @@
 require __DIR__ . '/includes/auth.php';
 requireLocateMeAccess(); // requireLogin() + a 403 for logged-in users without the "Locate Me Access" permission (Admin > Agents)
 require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/includes/locateme_tools.php';
 
 // Same quota-badge pattern as hp_gas.php/rc_print.php.
 $isAdmin = ($_SESSION['role'] ?? '') === 'admin';
@@ -76,12 +77,21 @@ require __DIR__ . '/includes/header.php';
   .lm-field-label{width:38%;color:#777;font-weight:600;}
   .lm-field-value{color:#222;font-weight:500;word-break:break-word;}
   .lm-not-found{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:16px;color:#f87171;font-weight:600;}
+  .lm-tool-select{width:100%;padding:11px 16px;font-size:13px;color:#333;border:1px solid #e0e0e0;
+    border-radius:9px;background:#fff;outline:none;margin-bottom:10px;cursor:pointer;}
+  .lm-tool-select:focus{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.15);}
 </style>
 
 <div class="lm-card">
   <div class="lm-card-body">
-    <p class="lm-hint">Enter a mobile number to look it up against locateme.services' Mobile Info database.</p>
-    <input type="text" id="lmNumberBox" placeholder="9876543210" maxlength="10"
+    <p class="lm-hint">Pick a tool, then enter the matching value to search locateme.services' database.</p>
+    <select id="lmToolSelect" class="lm-tool-select">
+      <?php foreach (LOCATEME_TOOLS as $slug => $tool): ?>
+        <option value="<?= htmlspecialchars($slug) ?>" data-placeholder="<?= htmlspecialchars($tool['placeholder']) ?>"
+                <?= $slug === 'mobile-info' ? 'selected' : '' ?>><?= htmlspecialchars($tool['label']) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <input type="text" id="lmQueryBox" placeholder="Enter Mobile Number" maxlength="100"
            style="width:100%;padding:11px 16px;font-size:13px;color:#333;border:1px solid #e0e0e0;border-radius:9px;background:#fff;outline:none;">
     <div class="lm-row">
       <button id="lmSearchBtn" class="lm-btn">Search</button>
@@ -103,7 +113,8 @@ require __DIR__ . '/includes/header.php';
 <script>
 const searchBtn      = document.getElementById("lmSearchBtn");
 const clearBtn       = document.getElementById("lmClearBtn");
-const numberBox      = document.getElementById("lmNumberBox");
+const toolSelect     = document.getElementById("lmToolSelect");
+const queryBox       = document.getElementById("lmQueryBox");
 const statusEl       = document.getElementById("lmStatus");
 const resultWrap     = document.getElementById("lmResultWrap");
 const quotaBadge     = document.getElementById("lmQuotaBadge");
@@ -121,9 +132,20 @@ function formatDuration(seconds) {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
+// Placeholder swaps to match whatever the selected tool actually expects
+// (mobile number, Aadhaar number, vehicle number, email, IFSC code, ...) -
+// see includes/locateme_tools.php for the full list, mirrored server-side
+// in Gas/lpg_web/locate_tools.py's TOOL_REGISTRY.
+function updatePlaceholder() {
+  const opt = toolSelect.options[toolSelect.selectedIndex];
+  queryBox.placeholder = opt ? opt.dataset.placeholder : "";
+}
+toolSelect.addEventListener("change", updatePlaceholder);
+updatePlaceholder();
+
 // There's no per-step progress to report here (unlike LPG's job-based
 // polling) - this is one blocking fetch for the whole login+search+scrape
-// sequence in Gas/lpg_web/mobile_info.py, so the bar itself is always
+// sequence in Gas/lpg_web/locate_tools.py, so the bar itself is always
 // indeterminate (striped, animating). The countdown is a fixed estimate,
 // same idea as hp_gas.php's own "~Xs remaining".
 const ESTIMATED_SECONDS = 20;
@@ -160,17 +182,18 @@ function updateQuotaBadge(used, limit) {
   quotaBadge.classList.toggle("badge-neutral", used < limit);
 }
 
-// Records come from mobile_info.py scraping locateme.services' own result
-// cards generically (label/value field pairs under a name+status header) -
-// rendered as-is here rather than assuming fixed field names, since
-// whatever fields locateme.services shows for a given number is what gets
-// displayed. A number that's changed hands/been ported can return more
-// than one record - each gets its own card.
+// Records come from Gas/lpg_web/locate_tools.py scraping locateme.services'
+// own result cards generically (label/value field pairs under a
+// name+status header) - rendered as-is here rather than assuming fixed
+// field names, since whatever fields locateme.services shows for a given
+// query is what gets displayed. Some queries (e.g. a mobile number that's
+// changed hands/been ported) can return more than one record - each gets
+// its own card.
 function renderResult(data) {
   resultWrap.innerHTML = "";
 
   if (!data.found) {
-    resultWrap.innerHTML = `<div class="lm-not-found">Not found for ${data.mobileNumber}.</div>`;
+    resultWrap.innerHTML = `<div class="lm-not-found">Not found for ${data.query}.</div>`;
   } else if (Array.isArray(data.records) && data.records.length) {
     const count = document.createElement("div");
     count.className = "lm-result-count";
@@ -202,11 +225,13 @@ function renderResult(data) {
       resultWrap.appendChild(box);
     });
   } else {
-    // Fallback if locateme.services' DOM structure ever changes and
-    // mobile_info.py couldn't extract labeled records - see mobile_info.py.
+    // Fallback if locateme.services' DOM structure doesn't match the
+    // generic card scraper for this particular tool (e.g. whatsapp-dp,
+    // which returns an image rather than label/value fields) - see
+    // locate_tools.py's module docstring.
     const box = document.createElement("div");
     box.className = "lm-record";
-    box.innerHTML = `<div class="lm-record-header"><span class="lm-record-name">Result for ${data.mobileNumber}</span></div>
+    box.innerHTML = `<div class="lm-record-header"><span class="lm-record-name">Result for ${data.query}</span></div>
       <div style="padding:16px;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;"></div>`;
     box.querySelector("div:last-child").textContent = data.rawText || "(no details captured)";
     resultWrap.appendChild(box);
@@ -220,9 +245,10 @@ function renderResult(data) {
 }
 
 async function runSearch() {
-  const mobileNumber = numberBox.value.replace(/\D/g, "");
-  if (mobileNumber.length !== 10) {
-    statusEl.textContent = "Enter a valid 10-digit mobile number.";
+  const tool = toolSelect.value;
+  const query = queryBox.value.trim();
+  if (!query) {
+    statusEl.textContent = "Enter a value to search.";
     return;
   }
 
@@ -235,7 +261,7 @@ async function runSearch() {
     const res = await fetch("locate_me_api.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mobileNumber })
+      body: JSON.stringify({ tool, query })
     });
     const data = await res.json();
 
@@ -259,11 +285,11 @@ async function runSearch() {
 }
 
 searchBtn.addEventListener("click", runSearch);
-numberBox.addEventListener("keydown", (e) => {
+queryBox.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !searchBtn.disabled) runSearch();
 });
 clearBtn.addEventListener("click", () => {
-  numberBox.value = "";
+  queryBox.value = "";
   statusEl.textContent = "";
   resultWrap.style.display = "none";
   stopProgress(null);

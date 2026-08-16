@@ -1,14 +1,15 @@
 <?php
-// Server-side proxy between the browser and the Mobile Info automation,
-// same shape as hp_gas_api.php/rc_print_api.php: runs centrally via
-// Gas/lpg_web's Flask service, browser never talks to locateme.services or
-// Flask directly, and the locateme.services login lives in
-// Gas/lpg_web/rc_print.py (reused by mobile_info.py), not in this app's
-// database.
+// Server-side proxy between the browser and the locateme.services tool
+// automations, same shape as hp_gas_api.php/rc_print_api.php: runs
+// centrally via Gas/lpg_web's Flask service (the generic /api/locate-tool
+// route, backed by Gas/lpg_web/locate_tools.py), browser never talks to
+// locateme.services or Flask directly, and the locateme.services login
+// lives in Gas/lpg_web/rc_print.py, not in this app's database.
 require __DIR__ . '/includes/auth.php';
 requireLocateMeAccess();
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/includes/locateme_archive.php';
+require_once __DIR__ . '/includes/locateme_tools.php';
 
 header('Content-Type: application/json');
 
@@ -20,19 +21,27 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$data = json_decode(file_get_contents('php://input'), true) ?: [];
-$mobileNumber = preg_replace('/\D/', '', $data['mobileNumber'] ?? '');
+$data  = json_decode(file_get_contents('php://input'), true) ?: [];
+$tool  = (string) ($data['tool'] ?? '');
+$query = trim((string) ($data['query'] ?? ''));
 
-if (strlen($mobileNumber) !== 10) {
+if (!isset(LOCATEME_TOOLS[$tool])) {
     http_response_code(400);
-    echo json_encode(['error' => 'Enter a valid 10-digit mobile number.']);
+    echo json_encode(['error' => 'Unknown Locate Me tool.']);
+    exit;
+}
+if ($query === '' || mb_strlen($query) > 100) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Enter a value to search.']);
     exit;
 }
 
-// Each search spends real credits (100/search) on the single shared
-// locateme.services account, so every agent is capped per calendar month
-// (Admin > Agents > "Locate Me Monthly Limit") - same reasoning and query
-// shape as hp_gas_api.php's limit check. Admins bypass this entirely.
+// Every tool spends real credits on the single shared locateme.services
+// account, so every agent is capped per calendar month across ALL Locate Me
+// tools combined (Admin > Agents > "Locate Me Monthly Limit") - one shared
+// budget line for the whole feature rather than a separate cap per tool,
+// since per-tool credit costs already vary wildly (1 to 150). Admins bypass
+// this entirely, same as every other metered tool in this app.
 if (($_SESSION['role'] ?? '') !== 'admin') {
     $stmt = $pdo->prepare('SELECT locate_me_monthly_limit FROM users WHERE id = :id');
     $stmt->execute(['id' => $_SESSION['user_id']]);
@@ -55,14 +64,14 @@ if (($_SESSION['role'] ?? '') !== 'admin') {
     }
 }
 
-$ch = curl_init(FLASK_BASE . '/api/mobile-info');
+$ch = curl_init(FLASK_BASE . '/api/locate-tool');
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 // Generous timeout - a fresh locateme.services login plus their own search,
 // same reasoning as hp_gas_api.php.
 curl_setopt($ch, CURLOPT_TIMEOUT, 90);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['mobileNumber' => $mobileNumber]));
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['toolSlug' => $tool, 'query' => $query]));
 $response = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $err      = curl_error($ch);
@@ -89,7 +98,7 @@ if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decode
              VALUES (:uid, 'locate_me', :q, :cnt, :ip)"
         )->execute([
             'uid' => $_SESSION['user_id'],
-            'q' => $mobileNumber,
+            'q' => LOCATEME_TOOLS[$tool]['label'] . ': ' . $query,
             'cnt' => $recordCount,
             'ip' => substr($ip, 0, 45),
         ]);
@@ -110,7 +119,7 @@ if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decode
     } catch (PDOException $e) {}
 
     if (!empty($decoded['found']) && !empty($decoded['records'])) {
-        archiveLocateMeResults($decoded['records'], currentUser()['username'] ?? 'unknown', $mobileNumber);
+        archiveLocateMeResults($decoded['records'], currentUser()['username'] ?? 'unknown', LOCATEME_TOOLS[$tool]['label'] . ': ' . $query);
     }
 }
 

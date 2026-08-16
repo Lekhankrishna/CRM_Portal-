@@ -9,7 +9,7 @@ from lpg_search import run_bulk_search
 from rc_print import run_rc_print
 from hp_gas import run_hp_gas_single
 from tataplay import run_tataplay_single
-from mobile_info import run_mobile_info_single
+from locate_tools import run_tool_search, TOOL_REGISTRY
 
 app = Flask(__name__)
 
@@ -293,22 +293,25 @@ def tataplay():
     return jsonify(result)
 
 
-@app.route("/api/mobile-info", methods=["POST"])
-def mobile_info():
+@app.route("/api/locate-tool", methods=["POST"])
+def locate_tool():
     data = request.get_json(silent=True) or {}
-    mobile_number = str(data.get("mobileNumber", "")).strip()
+    tool_slug = str(data.get("toolSlug", "")).strip()
+    query = str(data.get("query", "")).strip()
 
-    if not mobile_number:
-        return jsonify({"error": "No mobile number provided"}), 400
+    if tool_slug not in TOOL_REGISTRY:
+        return jsonify({"error": "Unknown tool"}), 400
+    if not query:
+        return jsonify({"error": "No query value provided"}), 400
 
-    # Same shape as /api/rc-print/hp-gas/tataplay - single lookup, synchronous,
+    # Same shape as /api/mobile-info etc - single lookup, synchronous,
     # sharing selenium_semaphore with every other Selenium-backed tool.
     with selenium_semaphore:
         try:
-            result = run_mobile_info_single(mobile_number)
+            result = run_tool_search(tool_slug, query)
         except Exception as e:
             full_trace = traceback.format_exc()
-            print(f"[mobile-info {mobile_number}] FAILED:\n{full_trace}")
+            print(f"[locate-tool {tool_slug} {query}] FAILED:\n{full_trace}")
             return jsonify({"error": clean_error_message(e)}), 502
 
     return jsonify(result)
