@@ -62,20 +62,32 @@ require __DIR__ . '/includes/header.php';
     background-size:34px 100%;animation:lm-progress-stripes 1s linear infinite;}
   @keyframes lm-progress-stripes{from{background-position:0 0;}to{background-position:-34px 0;}}
   .lm-progress-meta{display:flex;justify-content:space-between;margin-top:6px;font-size:11.5px;color:#999;}
-  /* Results - same shape as advanced_search.php's .as-result-wrap/.as-table:
-     one row per record, columns = every field label seen across all
-     records (union, first-seen order) rather than a fixed column list,
-     since different Locate Me tools (and even different records from the
-     same tool) can surface different fields. */
-  .lm-result-wrap{margin-top:16px;display:none;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow-x:auto;}
-  .lm-table-toolbar{padding:10px 16px;background:#4f46e5;color:#fff;font-size:11.5px;font-weight:700;
-    text-transform:uppercase;letter-spacing:.3px;}
-  .lm-table{width:100%;border-collapse:collapse;font-size:11.5px;}
-  .lm-table th{background:#eeeef6;color:#555;font-size:10px;font-weight:700;text-transform:uppercase;
-    letter-spacing:.3px;padding:6px 8px;text-align:left;white-space:nowrap;border-bottom:1px solid #e0e0e0;}
-  .lm-table td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top;color:#333;max-width:260px;word-break:break-word;}
-  .lm-table tr:nth-child(even) td{background:#f8f8fc;}
-  .lm-raw-body{padding:16px;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;color:#333;}
+  /* Results - one card per record/section (name+icon header, optional
+     status badge, then a 2-column grid of icon+label+value fields) -
+     same general shape as locateme.services' own result page, light
+     card tokens matching hp_gas.php/rc_print.php's cards elsewhere in
+     this app rather than that site's dark theme. */
+  .lm-result-wrap{margin-top:16px;display:none;}
+  .lm-result-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .lm-result-count{font-size:12px;color:#777;font-weight:600;}
+  .lm-export-btn{background:#10b981;color:#fff;border:none;box-shadow:0 4px 18px rgba(16,185,129,.3);padding:9px 18px;
+    border-radius:9px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;
+    display:inline-flex;align-items:center;gap:8px;transition:all 150ms;}
+  .lm-export-btn:hover:not(:disabled){background:#0d9668;transform:translateY(-1px);box-shadow:0 6px 20px rgba(16,185,129,.45);}
+  .lm-export-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none;}
+  .lm-record{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;margin-bottom:14px;}
+  .lm-record-header{padding:12px 16px;background:#4f46e5;color:#fff;display:flex;align-items:center;gap:10px;}
+  .lm-record-header i{font-size:16px;}
+  .lm-record-name{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;}
+  .lm-record-status{margin-left:auto;font-size:10.5px;padding:2px 10px;border-radius:999px;
+    font-weight:700;text-transform:uppercase;letter-spacing:.3px;background:rgba(255,255,255,.2);}
+  .lm-field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;padding:16px;}
+  .lm-field-item{display:flex;align-items:flex-start;gap:10px;}
+  .lm-field-item i{font-size:15px;color:#4f46e5;margin-top:2px;flex-shrink:0;}
+  .lm-field-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#999;margin-bottom:2px;}
+  .lm-field-value{font-size:13px;font-weight:600;color:#222;word-break:break-word;}
+  .lm-raw-body{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:16px;
+    font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;color:#333;margin-top:16px;display:none;}
   .lm-no-results{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
     padding:56px 16px;color:#999;margin-top:16px;}
   .lm-no-results i{font-size:38px;color:#ccc;width:74px;height:74px;display:flex;align-items:center;justify-content:center;
@@ -122,18 +134,21 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <div class="lm-result-wrap" id="lmResultWrap">
-  <div class="lm-table-toolbar" id="lmResultToolbar"></div>
-  <table class="lm-table" id="lmResultTable">
-    <thead><tr id="lmResultHeadRow"></tr></thead>
-    <tbody id="lmResultBody"></tbody>
-  </table>
-  <div class="lm-raw-body" id="lmRawBody" style="display:none"></div>
+  <div class="lm-result-toolbar">
+    <span class="lm-result-count" id="lmResultCountText"></span>
+    <button id="lmExportBtn" class="lm-export-btn" type="button" disabled>
+      <i class="bi bi-file-earmark-excel"></i> Export as Excel (CSV)
+    </button>
+  </div>
+  <div id="lmRecordsWrap"></div>
 </div>
+<div class="lm-raw-body" id="lmRawBody"></div>
 <div class="lm-no-results" id="lmNoResults" style="display:none">
   <i class="bi bi-search"></i>
   <span>No records found</span>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 const searchBtn      = document.getElementById("lmSearchBtn");
 const clearBtn       = document.getElementById("lmClearBtn");
@@ -141,10 +156,9 @@ const toolTabs       = document.getElementById("lmToolTabs");
 const queryBox       = document.getElementById("lmQueryBox");
 const statusEl       = document.getElementById("lmStatus");
 const resultWrap     = document.getElementById("lmResultWrap");
-const resultToolbar  = document.getElementById("lmResultToolbar");
-const resultTable    = document.getElementById("lmResultTable");
-const resultHeadRow  = document.getElementById("lmResultHeadRow");
-const resultBody     = document.getElementById("lmResultBody");
+const resultCountText= document.getElementById("lmResultCountText");
+const exportBtn      = document.getElementById("lmExportBtn");
+const recordsWrap    = document.getElementById("lmRecordsWrap");
 const rawBody        = document.getElementById("lmRawBody");
 const noResultsEl    = document.getElementById("lmNoResults");
 const quotaBadge     = document.getElementById("lmQuotaBadge");
@@ -215,67 +229,84 @@ function updateQuotaBadge(used, limit) {
   quotaBadge.classList.toggle("badge-neutral", used < limit);
 }
 
+// Best-guess icon per field label - not a literal match to whatever icon
+// locateme.services itself shows (that varies per tool/field and isn't
+// worth hand-mapping across 24 tools), just a reasonable visual cue based
+// on common keywords so the field grid doesn't read as a flat wall of text.
+function fieldIcon(label) {
+  const l = label.toLowerCase();
+  if (/(phone|mobile|node|number)/.test(l)) return "bi-telephone-fill";
+  if (/(address|location|city|state|pincode|circle)/.test(l)) return "bi-geo-alt-fill";
+  if (/name/.test(l)) return "bi-person-fill";
+  if (/(bank|account|ifsc)/.test(l)) return "bi-bank";
+  if (/(email|mail)/.test(l)) return "bi-envelope-fill";
+  if (/(aadhaar|pan|id|linkage|imei)/.test(l)) return "bi-credit-card-2-front-fill";
+  if (/(valid|verif|status|merchant)/.test(l)) return "bi-shield-check";
+  if (/(vpa|upi|credit)/.test(l)) return "bi-wallet2";
+  return "bi-info-circle-fill";
+}
+
 // Records come from Gas/lpg_web/locate_tools.py scraping locateme.services'
 // own result cards generically (label/value field pairs under a
 // name+status header, or under a section title - see locate_tools.py) -
-// rendered as one table row per record here (same shape as
-// advanced_search.php's result table), columns built as the union of every
-// field label seen across all records rather than a fixed list, since
-// different tools (and even different records from the same tool) can
-// surface different fields. Some queries (e.g. a mobile number that's
-// changed hands/been ported) return more than one record - each gets its
-// own row.
+// rendered as-is here rather than assuming fixed field names, since
+// whatever fields locateme.services shows for a given query is what gets
+// displayed. Some queries (e.g. a mobile number that's changed hands/been
+// ported, or a "lookup" tool with several grouped sections) return more
+// than one record - each gets its own card.
+function buildRecordCard(record) {
+  const box = document.createElement("div");
+  box.className = "lm-record";
+
+  const header = document.createElement("div");
+  header.className = "lm-record-header";
+  const headerIcon = record.status ? "bi-person-circle" : "bi-folder2-open";
+  header.innerHTML = `<i class="bi ${headerIcon}"></i><span class="lm-record-name"></span><span class="lm-record-status"></span>`;
+  header.querySelector(".lm-record-name").textContent = record.name || "Record";
+  const statusBadge = header.querySelector(".lm-record-status");
+  if (record.status) { statusBadge.textContent = record.status; } else { statusBadge.remove(); }
+  box.appendChild(header);
+
+  const grid = document.createElement("div");
+  grid.className = "lm-field-grid";
+  (record.fields || []).forEach(field => {
+    const item = document.createElement("div");
+    item.className = "lm-field-item";
+    item.innerHTML = `<i class="bi"></i><div><div class="lm-field-label"></div><div class="lm-field-value"></div></div>`;
+    item.querySelector("i").classList.add(fieldIcon(field.label));
+    item.querySelector(".lm-field-label").textContent = field.label;
+    item.querySelector(".lm-field-value").textContent = field.value || "—";
+    grid.appendChild(item);
+  });
+  box.appendChild(grid);
+  return box;
+}
+
+let lastRecords = [];
+
 function renderResult(data) {
-  resultHeadRow.innerHTML = "";
-  resultBody.innerHTML = "";
-  resultTable.style.display = "none";
+  recordsWrap.innerHTML = "";
+  resultWrap.style.display = "none";
   rawBody.style.display = "none";
   noResultsEl.style.display = "none";
-  resultWrap.style.display = "none";
+  exportBtn.disabled = true;
+  lastRecords = [];
 
   const records = (data.found && Array.isArray(data.records)) ? data.records : [];
 
   if (records.length) {
-    const hasName   = records.some(r => r.name);
-    const hasStatus = records.some(r => r.status);
-    const columns = [];
-    if (hasName) columns.push("Record");
-    if (hasStatus) columns.push("Status");
-    const columnSet = new Set(columns);
-    records.forEach(r => (r.fields || []).forEach(f => {
-      if (!columnSet.has(f.label)) { columnSet.add(f.label); columns.push(f.label); }
-    }));
-
-    resultToolbar.textContent = `${records.length} result${records.length === 1 ? "" : "s"}`;
-    columns.forEach(c => {
-      const th = document.createElement("th");
-      th.textContent = c;
-      resultHeadRow.appendChild(th);
-    });
-    records.forEach(r => {
-      const valueMap = {};
-      if (hasName) valueMap["Record"] = r.name || "—";
-      if (hasStatus) valueMap["Status"] = r.status || "—";
-      (r.fields || []).forEach(f => { valueMap[f.label] = f.value || "—"; });
-      const tr = document.createElement("tr");
-      columns.forEach(c => {
-        const td = document.createElement("td");
-        td.textContent = valueMap[c] || "—";
-        tr.appendChild(td);
-      });
-      resultBody.appendChild(tr);
-    });
-    resultTable.style.display = "";
+    lastRecords = records;
+    resultCountText.textContent = `${records.length} result${records.length === 1 ? "" : "s"} found`;
+    exportBtn.disabled = false;
+    records.forEach(r => recordsWrap.appendChild(buildRecordCard(r)));
     resultWrap.style.display = "block";
   } else if (data.found && data.rawText) {
     // Fallback if locateme.services' DOM structure matches neither
     // extraction pattern for this particular tool (e.g. whatsapp-dp, which
     // returns an image rather than label/value fields) - see
     // locate_tools.py's module docstring.
-    resultToolbar.textContent = `Result for ${data.query}`;
     rawBody.textContent = data.rawText;
-    rawBody.style.display = "";
-    resultWrap.style.display = "block";
+    rawBody.style.display = "block";
   } else {
     noResultsEl.style.display = "flex";
   }
@@ -285,6 +316,36 @@ function renderResult(data) {
     updateQuotaBadge(data.used, data.limit);
   }
 }
+
+// Columns are fully dynamic (whatever fields locateme.services showed for
+// each record - see buildRecordCard), built as the union of every label
+// seen in first-seen order, same approach as hp_gas.php's bulk-search CSV
+// export.
+exportBtn.addEventListener("click", () => {
+  if (!lastRecords.length) return;
+  const hasName   = lastRecords.some(r => r.name);
+  const hasStatus = lastRecords.some(r => r.status);
+  const columns = [];
+  if (hasName) columns.push("Record");
+  if (hasStatus) columns.push("Status");
+  const columnSet = new Set(columns);
+  lastRecords.forEach(r => (r.fields || []).forEach(f => {
+    if (!columnSet.has(f.label)) { columnSet.add(f.label); columns.push(f.label); }
+  }));
+
+  const aoa = [columns, ...lastRecords.map(r => {
+    const valueMap = {};
+    if (hasName) valueMap["Record"] = r.name || "";
+    if (hasStatus) valueMap["Status"] = r.status || "";
+    (r.fields || []).forEach(f => { valueMap[f.label] = f.value || ""; });
+    return columns.map(c => valueMap[c] || "");
+  })];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Result");
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  XLSX.writeFile(wb, `locate-me-${activeTool}-${stamp}.xlsx`);
+});
 
 async function runSearch() {
   const tool = activeTool;
@@ -297,6 +358,7 @@ async function runSearch() {
   searchBtn.disabled = true;
   statusEl.textContent = "";
   resultWrap.style.display = "none";
+  rawBody.style.display = "none";
   noResultsEl.style.display = "none";
   startProgress();
 
@@ -335,7 +397,10 @@ clearBtn.addEventListener("click", () => {
   queryBox.value = "";
   statusEl.textContent = "";
   resultWrap.style.display = "none";
+  rawBody.style.display = "none";
   noResultsEl.style.display = "none";
+  exportBtn.disabled = true;
+  lastRecords = [];
   stopProgress(null);
   stopConfetti();
 });
