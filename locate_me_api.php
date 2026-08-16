@@ -86,6 +86,15 @@ switch ($requiresAccess) {
         $limitLabel  = 'HP LPG Search';
         break;
     default:
+        // Per-tool checklist (Admin > Agents > "Locate Me" -> expandable
+        // tool list, see migrate_add_locate_me_tools.sql) - on top of the
+        // page-level requireLocateMeAccess() check above, an agent can be
+        // restricted to a subset of tools rather than all-or-nothing.
+        if (!hasLocateMeToolAccess($tool)) {
+            http_response_code(403);
+            echo json_encode(['error' => LOCATEME_TOOLS[$tool]['label'] . ' access has not been granted for this account.']);
+            exit;
+        }
         $limitColumn = 'locate_me_monthly_limit';
         $searchType  = 'locate_me';
         $limitLabel  = 'Locate Me';

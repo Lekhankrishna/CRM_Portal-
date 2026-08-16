@@ -2,9 +2,26 @@
 require __DIR__ . '/../includes/auth.php';
 requireAdmin('../login.php');
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/locateme_tools.php';
 
 $message     = '';
 $messageType = 'success';
+
+// Shared by both the create form and edit modal's Locate Me tool
+// checklist - never trust raw POST values as tool slugs directly.
+$LOCATEME_SELECTABLE_SLUGS = array_keys(locateMeSelectableTools());
+
+// Reads locate_me_tools[] from the current POST, filtered against the
+// known-tool allowlist, and JSON-encodes it for storage. An admin
+// unchecking every box submits no locate_me_tools[] entries at all, which
+// still needs to save as an explicit '[]' (not skip the column) - see
+// migrate_add_locate_me_tools.sql's NULL-vs-empty-array distinction.
+function locateMeToolsFromPost(array $allowedSlugs): string {
+    $submitted = $_POST['locate_me_tools'] ?? [];
+    if (!is_array($submitted)) $submitted = [];
+    $filtered = array_values(array_intersect($submitted, $allowedSlugs));
+    return json_encode($filtered);
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
@@ -18,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $lpgAccess = isset($_POST['lpg_search_access']) ? 1 : 0;
         $locateMeAccess = isset($_POST['locate_me_access']) ? 1 : 0;
         $locateMeMonthlyLimit = min(65535, max(0, (int) ($_POST['locate_me_monthly_limit'] ?? 5)));
+        $locateMeTools = locateMeToolsFromPost($LOCATEME_SELECTABLE_SLUGS);
         $rcPrintAccess = isset($_POST['rc_print_access']) ? 1 : 0;
         $rcPrintMonthlyLimit = min(65535, max(0, (int) ($_POST['rc_print_monthly_limit'] ?? 5)));
         $hpGasAccess = isset($_POST['hp_gas_access']) ? 1 : 0;
@@ -41,8 +59,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'danger';
         } else {
             $stmt = $pdo->prepare(
-                'INSERT INTO users (username, password_hash, full_name, mobile_no, role, lpg_search_access, locate_me_access, locate_me_monthly_limit, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, tata_play_access, tata_play_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, max_concurrent_sessions, expires_at)
-                 VALUES (:username, :hash, :full_name, :mobile_no, :role, :lpg_access, :locate_me_access, :locate_me_monthly_limit, :rc_print_access, :rc_print_monthly_limit, :hp_gas_access, :hp_gas_monthly_limit, :tata_play_access, :tata_play_monthly_limit, :eagle_eye_access, :eagle_eye_monthly_limit, :pan_india_access, :pan_india_pro_access, :pan_india_pro_monthly_limit, :advanced_search_access, :advanced_search_monthly_limit, :max_sessions, :expires_at)'
+                'INSERT INTO users (username, password_hash, full_name, mobile_no, role, lpg_search_access, locate_me_access, locate_me_monthly_limit, locate_me_tools, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, tata_play_access, tata_play_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, max_concurrent_sessions, expires_at)
+                 VALUES (:username, :hash, :full_name, :mobile_no, :role, :lpg_access, :locate_me_access, :locate_me_monthly_limit, :locate_me_tools, :rc_print_access, :rc_print_monthly_limit, :hp_gas_access, :hp_gas_monthly_limit, :tata_play_access, :tata_play_monthly_limit, :eagle_eye_access, :eagle_eye_monthly_limit, :pan_india_access, :pan_india_pro_access, :pan_india_pro_monthly_limit, :advanced_search_access, :advanced_search_monthly_limit, :max_sessions, :expires_at)'
             );
             try {
                 $stmt->execute([
@@ -54,6 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'lpg_access'=> $lpgAccess,
                     'locate_me_access' => $locateMeAccess,
                     'locate_me_monthly_limit' => $locateMeMonthlyLimit,
+                    'locate_me_tools' => $locateMeTools,
                     'rc_print_access' => $rcPrintAccess,
                     'rc_print_monthly_limit' => $rcPrintMonthlyLimit,
                     'hp_gas_access' => $hpGasAccess,
@@ -92,6 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $lpgAccess = isset($_POST['lpg_search_access']) ? 1 : 0;
         $locateMeAccess = isset($_POST['locate_me_access']) ? 1 : 0;
         $locateMeMonthlyLimit = min(65535, max(0, (int) ($_POST['locate_me_monthly_limit'] ?? 5)));
+        $locateMeTools = locateMeToolsFromPost($LOCATEME_SELECTABLE_SLUGS);
         $rcPrintAccess = isset($_POST['rc_print_access']) ? 1 : 0;
         $rcPrintMonthlyLimit = min(65535, max(0, (int) ($_POST['rc_print_monthly_limit'] ?? 5)));
         $hpGasAccess = isset($_POST['hp_gas_access']) ? 1 : 0;
@@ -118,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message     = 'New password must be at least 6 characters (or leave it blank to keep the current one).';
             $messageType = 'danger';
         } else {
-            $sql = 'UPDATE users SET username = :username, full_name = :full_name, mobile_no = :mobile_no, role = :role, lpg_search_access = :lpg_access, locate_me_access = :locate_me_access, locate_me_monthly_limit = :locate_me_monthly_limit, rc_print_access = :rc_print_access, rc_print_monthly_limit = :rc_print_monthly_limit, hp_gas_access = :hp_gas_access, hp_gas_monthly_limit = :hp_gas_monthly_limit, tata_play_access = :tata_play_access, tata_play_monthly_limit = :tata_play_monthly_limit, eagle_eye_access = :eagle_eye_access, eagle_eye_monthly_limit = :eagle_eye_monthly_limit, pan_india_access = :pan_india_access, pan_india_pro_access = :pan_india_pro_access, pan_india_pro_monthly_limit = :pan_india_pro_monthly_limit, advanced_search_access = :advanced_search_access, advanced_search_monthly_limit = :advanced_search_monthly_limit, max_concurrent_sessions = :max_sessions, expires_at = :expires_at';
+            $sql = 'UPDATE users SET username = :username, full_name = :full_name, mobile_no = :mobile_no, role = :role, lpg_search_access = :lpg_access, locate_me_access = :locate_me_access, locate_me_monthly_limit = :locate_me_monthly_limit, locate_me_tools = :locate_me_tools, rc_print_access = :rc_print_access, rc_print_monthly_limit = :rc_print_monthly_limit, hp_gas_access = :hp_gas_access, hp_gas_monthly_limit = :hp_gas_monthly_limit, tata_play_access = :tata_play_access, tata_play_monthly_limit = :tata_play_monthly_limit, eagle_eye_access = :eagle_eye_access, eagle_eye_monthly_limit = :eagle_eye_monthly_limit, pan_india_access = :pan_india_access, pan_india_pro_access = :pan_india_pro_access, pan_india_pro_monthly_limit = :pan_india_pro_monthly_limit, advanced_search_access = :advanced_search_access, advanced_search_monthly_limit = :advanced_search_monthly_limit, max_concurrent_sessions = :max_sessions, expires_at = :expires_at';
             $params = [
                 'username'  => $username,
                 'full_name' => $fullName,
@@ -127,6 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'lpg_access'=> $lpgAccess,
                 'locate_me_access' => $locateMeAccess,
                 'locate_me_monthly_limit' => $locateMeMonthlyLimit,
+                'locate_me_tools' => $locateMeTools,
                 'rc_print_access' => $rcPrintAccess,
                 'rc_print_monthly_limit' => $rcPrintMonthlyLimit,
                 'hp_gas_access' => $hpGasAccess,
@@ -236,7 +257,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $users = $pdo->query(
-    'SELECT id, username, full_name, mobile_no, role, is_active, lpg_search_access, lpg_bookmarklet_key, locate_me_access, locate_me_monthly_limit, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, tata_play_access, tata_play_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, max_concurrent_sessions, expires_at, created_at, last_login_at FROM users ORDER BY created_at DESC'
+    'SELECT id, username, full_name, mobile_no, role, is_active, lpg_search_access, lpg_bookmarklet_key, locate_me_access, locate_me_monthly_limit, locate_me_tools, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, tata_play_access, tata_play_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, max_concurrent_sessions, expires_at, created_at, last_login_at FROM users ORDER BY created_at DESC'
 )->fetchAll();
 
 // Summary stats for the admin view. "Logged In" counts users who have ever
@@ -295,6 +316,23 @@ require __DIR__ . '/../includes/header.php';
   .acf-inline-field{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--c-text);white-space:nowrap;}
   .acf-inline-field input{width:56px;padding:8px 10px;border:1px solid var(--c-border);border-radius:var(--r-md);
     background:var(--c-surface);color:var(--c-text);font-size:13px;outline:none;}
+
+  /* Locate Me's per-tool checklist - expands below the Feature Access grid
+     when its own "Locate Me" checkbox is ticked (JS-toggled, see bottom of
+     this page), rather than living inside that one grid cell where 22
+     tools would never fit. */
+  .acf-locate-tools{display:none;margin:-4px 0 14px;padding:12px 14px;
+    border:1px dashed var(--c-accent);border-radius:var(--r-md);background:var(--c-accent-light);}
+  .acf-locate-tools.open{display:block;}
+  .acf-locate-tools-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+    color:var(--c-accent-hover);margin-bottom:8px;}
+  .acf-tools-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;}
+  .acf-tool-check{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--c-text);
+    cursor:pointer;padding:4px 6px;border-radius:6px;}
+  .acf-tool-check:hover{background:var(--c-surface);}
+  .acf-tool-check input{width:14px;height:14px;flex-shrink:0;accent-color:var(--c-accent);cursor:pointer;}
+  .acf-tool-check span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .acf-tool-credits{flex:0 0 auto;font-size:10px;color:var(--c-text-soft);font-weight:600;white-space:nowrap;}
 
   /* Edit modal widened (2026-08-08, widened further same day) - the shared
      .modal-box max-width (420px, used by every modal in the app) left
@@ -391,9 +429,9 @@ require __DIR__ . '/../includes/header.php';
         <span>LPG Search</span>
       </label>
       <label class="acf-feature">
-        <input type="checkbox" name="locate_me_access" value="1">
+        <input type="checkbox" name="locate_me_access" id="create-locate_me_access" value="1">
         <span>Locate Me</span>
-        <span class="acf-limit" title="How many Locate Me searches this agent can run per calendar month - each one spends real credits (100/search) on the shared locateme.services account. Ignored for admins.">
+        <span class="acf-limit" title="How many Locate Me searches this agent can run per calendar month, across whichever tools are checked below - each spends real credits (1-150/search depending on the tool) on the shared locateme.services account. Ignored for admins.">
           <input type="number" name="locate_me_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
         </span>
       </label>
@@ -443,6 +481,19 @@ require __DIR__ . '/../includes/header.php';
           <input type="number" name="advanced_search_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
         </span>
       </label>
+    </div>
+
+    <div class="acf-locate-tools" id="create-locate-tools-panel">
+      <div class="acf-locate-tools-label"><i class="bi bi-geo-alt-fill"></i> Locate Me — Select Tools</div>
+      <div class="acf-tools-grid">
+        <?php foreach (locateMeSelectableTools() as $slug => $t): ?>
+          <label class="acf-tool-check">
+            <input type="checkbox" name="locate_me_tools[]" value="<?= htmlspecialchars($slug) ?>" checked>
+            <span title="<?= htmlspecialchars($t['label']) ?>"><?= htmlspecialchars($t['label']) ?></span>
+            <span class="acf-tool-credits"><?= $t['credits'] !== null ? (int) $t['credits'] . ' cr' : '—' ?></span>
+          </label>
+        <?php endforeach; ?>
+      </div>
     </div>
 
     <div class="acf-row">
@@ -535,8 +586,12 @@ require __DIR__ . '/../includes/header.php';
             <span class="badge <?= $u['locate_me_access'] ? 'badge-success' : 'badge-neutral' ?>">
               <?= $u['locate_me_access'] ? 'Granted' : 'Not Granted' ?>
             </span>
-            <?php if ($u['locate_me_access'] && $u['role'] !== 'admin'): ?>
-              <div class="text-sm text-muted" style="margin-top:2px"><?= (int) $u['locate_me_monthly_limit'] ?>/month</div>
+            <?php if ($u['locate_me_access']):
+              $uToolCount = $u['locate_me_tools'] !== null ? count(json_decode($u['locate_me_tools'], true) ?: []) : count($LOCATEME_SELECTABLE_SLUGS);
+            ?>
+              <div class="text-sm text-muted" style="margin-top:2px">
+                <?= $uToolCount ?>/<?= count($LOCATEME_SELECTABLE_SLUGS) ?> tools<?= $u['role'] !== 'admin' ? ', ' . (int) $u['locate_me_monthly_limit'] . '/month' : '' ?>
+              </div>
             <?php endif; ?>
           </td>
           <td>
@@ -614,7 +669,7 @@ require __DIR__ . '/../includes/header.php';
           </td>
           <td class="action-cell">
             <button type="button" class="btn btn-sm btn-secondary"
-                    onclick="openEditModal(<?= (int) $u['id'] ?>, <?= htmlspecialchars(json_encode($u['username']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['full_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['mobile_no'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['role']), ENT_QUOTES) ?>, <?= (int) $u['lpg_search_access'] ?>, <?= (int) $u['locate_me_access'] ?>, <?= (int) $u['locate_me_monthly_limit'] ?>, <?= (int) $u['rc_print_access'] ?>, <?= (int) $u['rc_print_monthly_limit'] ?>, <?= (int) $u['hp_gas_access'] ?>, <?= (int) $u['hp_gas_monthly_limit'] ?>, <?= (int) $u['tata_play_access'] ?>, <?= (int) $u['tata_play_monthly_limit'] ?>, <?= (int) $u['eagle_eye_access'] ?>, <?= (int) $u['eagle_eye_monthly_limit'] ?>, <?= (int) $u['pan_india_access'] ?>, <?= (int) $u['pan_india_pro_access'] ?>, <?= (int) $u['pan_india_pro_monthly_limit'] ?>, <?= (int) $u['advanced_search_access'] ?>, <?= (int) $u['advanced_search_monthly_limit'] ?>, <?= (int) $u['max_concurrent_sessions'] ?>, <?= htmlspecialchars(json_encode($expiryDateValue), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($expiryTimeValue), ENT_QUOTES) ?>)">
+                    onclick="openEditModal(<?= (int) $u['id'] ?>, <?= htmlspecialchars(json_encode($u['username']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['full_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['mobile_no'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['role']), ENT_QUOTES) ?>, <?= (int) $u['lpg_search_access'] ?>, <?= (int) $u['locate_me_access'] ?>, <?= (int) $u['locate_me_monthly_limit'] ?>, <?= htmlspecialchars(json_encode($u['locate_me_tools'] !== null ? (json_decode($u['locate_me_tools'], true) ?: []) : null), ENT_QUOTES) ?>, <?= (int) $u['rc_print_access'] ?>, <?= (int) $u['rc_print_monthly_limit'] ?>, <?= (int) $u['hp_gas_access'] ?>, <?= (int) $u['hp_gas_monthly_limit'] ?>, <?= (int) $u['tata_play_access'] ?>, <?= (int) $u['tata_play_monthly_limit'] ?>, <?= (int) $u['eagle_eye_access'] ?>, <?= (int) $u['eagle_eye_monthly_limit'] ?>, <?= (int) $u['pan_india_access'] ?>, <?= (int) $u['pan_india_pro_access'] ?>, <?= (int) $u['pan_india_pro_monthly_limit'] ?>, <?= (int) $u['advanced_search_access'] ?>, <?= (int) $u['advanced_search_monthly_limit'] ?>, <?= (int) $u['max_concurrent_sessions'] ?>, <?= htmlspecialchars(json_encode($expiryDateValue), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($expiryTimeValue), ENT_QUOTES) ?>)">
               <i class="bi bi-pencil-square"></i> Edit
             </button>
             <?php if ($u['lpg_search_access'] && $u['lpg_bookmarklet_key']): ?>
@@ -739,6 +794,18 @@ require __DIR__ . '/../includes/header.php';
             </span>
           </label>
         </div>
+        <div class="acf-locate-tools" id="edit-locate-tools-panel">
+          <div class="acf-locate-tools-label"><i class="bi bi-geo-alt-fill"></i> Locate Me — Select Tools</div>
+          <div class="acf-tools-grid">
+            <?php foreach (locateMeSelectableTools() as $slug => $t): ?>
+              <label class="acf-tool-check">
+                <input type="checkbox" name="locate_me_tools[]" class="edit-locate-me-tool" value="<?= htmlspecialchars($slug) ?>">
+                <span title="<?= htmlspecialchars($t['label']) ?>"><?= htmlspecialchars($t['label']) ?></span>
+                <span class="acf-tool-credits"><?= $t['credits'] !== null ? (int) $t['credits'] . ' cr' : '—' ?></span>
+              </label>
+            <?php endforeach; ?>
+          </div>
+        </div>
       </div>
       <div class="edit-settings-grid">
         <div class="form-group">
@@ -779,7 +846,7 @@ require __DIR__ . '/../includes/header.php';
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
-function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, locateMeAccess, locateMeMonthlyLimit, rcPrintAccess, rcPrintMonthlyLimit, hpGasAccess, hpGasMonthlyLimit, tataPlayAccess, tataPlayMonthlyLimit, eagleEyeAccess, eagleEyeMonthlyLimit, panIndiaAccess, panIndiaProAccess, panIndiaProMonthlyLimit, advancedSearchAccess, advancedSearchMonthlyLimit, maxSessions, expiresDate, expiresTime) {
+function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, locateMeAccess, locateMeMonthlyLimit, locateMeTools, rcPrintAccess, rcPrintMonthlyLimit, hpGasAccess, hpGasMonthlyLimit, tataPlayAccess, tataPlayMonthlyLimit, eagleEyeAccess, eagleEyeMonthlyLimit, panIndiaAccess, panIndiaProAccess, panIndiaProMonthlyLimit, advancedSearchAccess, advancedSearchMonthlyLimit, maxSessions, expiresDate, expiresTime) {
   document.getElementById('edit-id').value = id;
   document.getElementById('edit-username').value = username;
   document.getElementById('edit-full_name').value = fullName;
@@ -788,6 +855,14 @@ function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, locate
   document.getElementById('edit-lpg_search_access').checked = !!lpgAccess;
   document.getElementById('edit-locate_me_access').checked = !!locateMeAccess;
   document.getElementById('edit-locate_me_monthly_limit').value = locateMeMonthlyLimit;
+  // locateMeTools is null (never explicitly configured - see
+  // migrate_add_locate_me_tools.sql) or an array of allowed tool slugs.
+  // null shows every box checked (matching what hasLocateMeToolAccess()
+  // actually grants in that case); a real array checks only its entries.
+  document.querySelectorAll('.edit-locate-me-tool').forEach(cb => {
+    cb.checked = locateMeTools === null || locateMeTools.includes(cb.value);
+  });
+  toggleLocateToolsPanel(document.getElementById('edit-locate_me_access'), document.getElementById('edit-locate-tools-panel'));
   document.getElementById('edit-rc_print_access').checked = !!rcPrintAccess;
   document.getElementById('edit-rc_print_monthly_limit').value = rcPrintMonthlyLimit;
   document.getElementById('edit-hp_gas_access').checked = !!hpGasAccess;
@@ -810,6 +885,19 @@ function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, locate
 function closeEditModal() {
   document.getElementById('edit-modal-overlay').style.display = 'none';
 }
+
+// Locate Me's per-tool checklist only makes sense once Locate Me itself is
+// checked - shown/hidden in lockstep with that one checkbox, same idea as
+// index.php's field-group show/hide per search mode.
+function toggleLocateToolsPanel(checkbox, panel) {
+  panel.classList.toggle('open', checkbox.checked);
+}
+document.getElementById('create-locate_me_access').addEventListener('change', function () {
+  toggleLocateToolsPanel(this, document.getElementById('create-locate-tools-panel'));
+});
+document.getElementById('edit-locate_me_access').addEventListener('change', function () {
+  toggleLocateToolsPanel(this, document.getElementById('edit-locate-tools-panel'));
+});
 document.getElementById('edit-password-toggle-btn').addEventListener('click', () => {
   const input = document.getElementById('edit-new_password');
   const icon  = document.getElementById('edit-password-toggle-icon');

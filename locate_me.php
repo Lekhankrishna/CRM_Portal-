@@ -112,21 +112,34 @@ require __DIR__ . '/includes/header.php';
 <div class="lm-card">
   <div class="lm-card-body">
     <p class="lm-hint">Pick a tool, then enter the matching value to search locateme.services' database.</p>
+    <?php
+    // Restricting an agent to a subset of tools (per-tool checklist below)
+    // can mean mobile-info itself isn't in their allowed list - the first
+    // tool actually rendered becomes the active one instead of assuming
+    // mobile-info always is, and its slug/placeholder feed the JS default
+    // below so the query box and the JS-side activeTool variable start in
+    // sync with whichever tab is visually marked active.
+    $firstVisibleTool = null;
+    ?>
     <div class="lm-tabs" id="lmToolTabs" role="tablist">
       <?php foreach (LOCATEME_TOOLS as $slug => $toolDef):
         // RC Print/HP Gas Advanced only show up here for agents who already
-        // have that specific access - see includes/locateme_tools.php.
+        // have that specific access; every other tool is gated by the
+        // per-tool checklist (Admin > Agents > "Locate Me") - see
+        // includes/locateme_tools.php and hasLocateMeToolAccess().
         $requires = $toolDef['requiresAccess'] ?? null;
         if ($requires === 'rc_print' && !hasRcPrintAccess()) continue;
         if ($requires === 'hp_gas' && !hasHpGasAccess()) continue;
+        if ($requires === null && !hasLocateMeToolAccess($slug)) continue;
+        if ($firstVisibleTool === null) $firstVisibleTool = ['slug' => $slug, 'placeholder' => $toolDef['placeholder']];
       ?>
-        <button type="button" class="lm-tab<?= $slug === 'mobile-info' ? ' active' : '' ?>"
+        <button type="button" class="lm-tab<?= $slug === $firstVisibleTool['slug'] ? ' active' : '' ?>"
                 data-tool="<?= htmlspecialchars($slug) ?>" data-placeholder="<?= htmlspecialchars($toolDef['placeholder']) ?>">
           <?= htmlspecialchars($toolDef['label']) ?>
         </button>
       <?php endforeach; ?>
     </div>
-    <input type="text" id="lmQueryBox" placeholder="Enter Mobile Number" maxlength="100"
+    <input type="text" id="lmQueryBox" placeholder="<?= htmlspecialchars($firstVisibleTool['placeholder'] ?? '') ?>" maxlength="100"
            style="width:100%;padding:11px 16px;font-size:13px;color:#333;border:1px solid #e0e0e0;border-radius:9px;background:#fff;outline:none;">
     <div class="lm-row">
       <button id="lmSearchBtn" class="lm-btn">Search</button>
@@ -204,7 +217,7 @@ function formatDuration(seconds) {
 // (mobile number, Aadhaar number, vehicle number, email, IFSC code, ...) -
 // see includes/locateme_tools.php for the full list, mirrored server-side
 // in Gas/lpg_web/locate_tools.py's TOOL_REGISTRY.
-let activeTool = "mobile-info";
+let activeTool = "<?= htmlspecialchars($firstVisibleTool['slug'] ?? '', ENT_QUOTES) ?>";
 toolTabs.querySelectorAll(".lm-tab").forEach(tab => tab.addEventListener("click", () => {
   toolTabs.querySelectorAll(".lm-tab").forEach(t => t.classList.remove("active"));
   tab.classList.add("active");
