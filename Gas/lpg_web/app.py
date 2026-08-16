@@ -8,6 +8,7 @@ import uuid
 from lpg_search import run_bulk_search
 from rc_print import run_rc_print
 from hp_gas import run_hp_gas_single
+from tataplay import run_tataplay_single
 
 app = Flask(__name__)
 
@@ -265,6 +266,27 @@ def hp_gas():
         except Exception as e:
             full_trace = traceback.format_exc()
             print(f"[hp-gas {mobile_number}] FAILED:\n{full_trace}")
+            return jsonify({"error": clean_error_message(e)}), 502
+
+    return jsonify(result)
+
+
+@app.route("/api/tataplay", methods=["POST"])
+def tataplay():
+    data = request.get_json(silent=True) or {}
+    mobile_number = str(data.get("mobileNumber", "")).strip()
+
+    if not mobile_number:
+        return jsonify({"error": "No mobile number provided"}), 400
+
+    # Same shape as /api/rc-print/hp-gas - single lookup, synchronous,
+    # sharing selenium_semaphore with every other Selenium-backed tool.
+    with selenium_semaphore:
+        try:
+            result = run_tataplay_single(mobile_number)
+        except Exception as e:
+            full_trace = traceback.format_exc()
+            print(f"[tataplay {mobile_number}] FAILED:\n{full_trace}")
             return jsonify({"error": clean_error_message(e)}), 502
 
     return jsonify(result)

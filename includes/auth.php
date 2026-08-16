@@ -125,6 +125,27 @@ function requireHpGasAccess(string $loginPath = 'login.php'): void {
 
 // Same pattern as hasHpGasAccess() - checked fresh from the DB every
 // request so a revoke from Admin > Agents takes effect immediately.
+function hasTataPlayAccess(): bool {
+    global $pdo;
+    if (!isLoggedIn()) return false;
+    static $access = null;
+    if ($access !== null) return $access;
+    $stmt = $pdo->prepare('SELECT tata_play_access FROM users WHERE id = :id');
+    $stmt->execute(['id' => $_SESSION['user_id']]);
+    $access = (bool) $stmt->fetchColumn();
+    return $access;
+}
+
+function requireTataPlayAccess(string $loginPath = 'login.php'): void {
+    requireLogin($loginPath);
+    if (!hasTataPlayAccess()) {
+        http_response_code(403);
+        die('Access denied: Tata Play Search access has not been granted for this account.');
+    }
+}
+
+// Same pattern as hasHpGasAccess() - checked fresh from the DB every
+// request so a revoke from Admin > Agents takes effect immediately.
 function hasEagleEyeAccess(): bool {
     global $pdo;
     if (!isLoggedIn()) return false;

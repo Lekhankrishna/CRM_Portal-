@@ -84,6 +84,14 @@ if (hasLpgSearchAccess()) {
     // old bookmarks/links.
     $searchRegionsExtra[] = ['label' => 'Indian LPG Search', 'href' => 'lpg_search.php'];
 }
+// Tata Play is opt-in per account (Admin > Agents > "Tata Play Access") -
+// same pattern as HP LPG Search above (own tataplay.py Selenium automation
+// against the distributor's mysso.tataplay.com SSO login, proxied through
+// tataplay_api.php). Placed directly below Indian LPG Search per explicit
+// instruction.
+if (hasTataPlayAccess()) {
+    $searchRegionsExtra[] = ['label' => 'Tata Play Search', 'href' => 'tataplay.php'];
+}
 $selectedState = $_GET['state'] ?? '';
 
 // Sidebar colour-coding (2026-08-03) - same 12-hue palette as the results
