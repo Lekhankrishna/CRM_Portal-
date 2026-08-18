@@ -80,6 +80,7 @@ if ($response === false) {
 $decoded = json_decode($response, true);
 if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decoded)) {
     try {
+        $accounts = $decoded['found'] ? ($decoded['accounts'] ?? []) : [];
         $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
         $pdo->prepare(
             "INSERT INTO search_logs (user_id, search_type, search_query, result_count, ip_address)
@@ -87,7 +88,7 @@ if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decode
         )->execute([
             'uid' => $_SESSION['user_id'],
             'q' => $mobileNumber,
-            'cnt' => $decoded['found'] ? 1 : 0,
+            'cnt' => count($accounts),
             'ip' => substr($ip, 0, 45),
         ]);
 
@@ -106,13 +107,17 @@ if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decode
         }
     } catch (PDOException $e) {}
 
-    if (!empty($decoded['found'])) {
+    // A search can genuinely match more than one account (see
+    // tataplay.py's run_tataplay_single()) - archive each one; already
+    // deduped per subscriber id + status inside archiveTataPlayResult()
+    // itself, so this is safe to call once per account.
+    foreach ($accounts as $account) {
         archiveTataPlayResult(
-            $decoded['accountName'] ?? '',
-            $decoded['subscriberId'] ?? '',
-            $decoded['accountStatus'] ?? '',
-            $decoded['address'] ?? '',
-            $decoded['lastRechargeDate'] ?? '',
+            $account['accountName'] ?? '',
+            $account['subscriberId'] ?? '',
+            $account['accountStatus'] ?? '',
+            $account['address'] ?? '',
+            $account['lastRechargeDate'] ?? '',
             currentUser()['username'] ?? 'unknown',
             $mobileNumber
         );

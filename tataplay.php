@@ -172,56 +172,81 @@ function statusChipClass(status) {
   return "";
 }
 
+// A search can genuinely match more than one account for the same mobile
+// number (confirmed live 2026-08-19 - a deactivated account and a pending
+// one for the same person) - each gets its own card instead of assuming
+// there's only ever one, same shape as Gas/lpg_web/tataplay.py's
+// run_tataplay_single(). address/lastRechargeDate come back "" for a
+// multi-match result (see that function's own comment on why), so those
+// two rows just show as empty rather than being hidden entirely - keeps
+// the field list the same shape whether it's a single match or several.
+function buildAccountCard(account, heading) {
+  const box = document.createElement("div");
+  box.className = "tp-section";
+  const title = document.createElement("div");
+  title.className = "tp-section-title";
+  title.textContent = heading;
+  box.appendChild(title);
+
+  const table = document.createElement("table");
+  table.className = "tp-section-table";
+  const tbody = document.createElement("tbody");
+
+  const rows = [
+    ["Account Name", account.accountName],
+    ["Subscriber Id", account.subscriberId],
+    ["Account Status", account.accountStatus],
+    ["Address", account.address],
+    ["Last Recharge Date", account.lastRechargeDate],
+  ];
+  rows.forEach(([label, value]) => {
+    const tr = document.createElement("tr");
+    const labelTd = document.createElement("td");
+    labelTd.className = "tp-field-label";
+    labelTd.textContent = label;
+    const valueTd = document.createElement("td");
+    valueTd.className = "tp-field-value";
+    if (label === "Account Status") {
+      const chip = document.createElement("span");
+      chip.className = "tp-status-chip " + statusChipClass(value);
+      chip.textContent = value || "—";
+      valueTd.appendChild(chip);
+    } else {
+      valueTd.textContent = value || "—";
+    }
+    tr.append(labelTd, valueTd);
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  box.appendChild(table);
+  return box;
+}
+
 function renderResult(data) {
   resultWrap.innerHTML = "";
 
-  if (!data.found) {
+  const accounts = (data.found && Array.isArray(data.accounts)) ? data.accounts : [];
+
+  if (!accounts.length) {
     resultWrap.innerHTML = `<div class="tp-not-found">Not found for ${data.mobileNumber}.</div>`;
+  } else if (accounts.length === 1) {
+    resultWrap.appendChild(buildAccountCard(accounts[0], "Account"));
   } else {
-    const box = document.createElement("div");
-    box.className = "tp-section";
-    const title = document.createElement("div");
-    title.className = "tp-section-title";
-    title.textContent = "Account";
-    box.appendChild(title);
-
-    const table = document.createElement("table");
-    table.className = "tp-section-table";
-    const tbody = document.createElement("tbody");
-
-    const rows = [
-      ["Account Name", data.accountName],
-      ["Subscriber Id", data.subscriberId],
-      ["Account Status", data.accountStatus],
-      ["Address", data.address],
-      ["Last Recharge Date", data.lastRechargeDate],
-    ];
-    rows.forEach(([label, value]) => {
-      const tr = document.createElement("tr");
-      const labelTd = document.createElement("td");
-      labelTd.className = "tp-field-label";
-      labelTd.textContent = label;
-      const valueTd = document.createElement("td");
-      valueTd.className = "tp-field-value";
-      if (label === "Account Status") {
-        const chip = document.createElement("span");
-        chip.className = "tp-status-chip " + statusChipClass(value);
-        chip.textContent = value || "—";
-        valueTd.appendChild(chip);
-      } else {
-        valueTd.textContent = value || "—";
-      }
-      tr.append(labelTd, valueTd);
-      tbody.appendChild(tr);
+    const notice = document.createElement("div");
+    notice.className = "tp-section-title";
+    notice.style.cssText = "background:none;color:#777;padding:0 0 8px;text-transform:none;font-weight:600;";
+    notice.textContent = `${accounts.length} accounts matched this number - showing all of them.`;
+    resultWrap.appendChild(notice);
+    accounts.forEach((account, i) => {
+      const card = buildAccountCard(account, `Account ${i + 1} of ${accounts.length}`);
+      card.style.marginTop = i > 0 ? "14px" : "0";
+      resultWrap.appendChild(card);
     });
-
-    table.appendChild(tbody);
-    box.appendChild(table);
-    resultWrap.appendChild(box);
   }
 
   resultWrap.style.display = "block";
-  if (data.found) startConfetti(); else stopConfetti();
+  if (accounts.length) startConfetti(); else stopConfetti();
   if (typeof data.used === "number" && typeof data.limit === "number") {
     updateQuotaBadge(data.used, data.limit);
   }

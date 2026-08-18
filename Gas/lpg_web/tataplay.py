@@ -16,15 +16,27 @@ from config import TATAPLAY_USERNAME, TATAPLAY_PASSWORD
 
 SSO_URL = "https://mysso.tataplay.com/"
 
-# Siebel's own quick-find result count line ("1 - 1 of 1", "1 - 13 of 13+",
-# ...) - the ONLY reliable signal that a search actually matched a single
-# real account, confirmed 2026-08-11: searching an unregistered mobile
+# Siebel's own quick-find result count line ("1 - 1 of 1", "1 - 2 of 2",
+# "1 - 13 of 13+", ...) - the ONLY reliable signal that a search actually
+# matched something, confirmed 2026-08-11: searching an unregistered mobile
 # number doesn't return zero rows, it silently falls back to a list of
 # unrelated recently-accessed accounts (also with a valid-looking "1 - N of
-# N" line) instead of erroring. Treating anything other than exactly one
-# result as "not found" is the only way to avoid handing back the wrong
-# customer's data.
+# N" line) instead of erroring.
 RESULT_COUNT_RE = re.compile(r"^\s*(\d+)\s*-\s*(\d+)\s*of\s*(\d+)\+?\s*$", re.MULTILINE)
+
+# A real customer can genuinely have more than one account record against
+# the same mobile number (confirmed live 2026-08-19, searching 9884121267:
+# "1 - 2 of 2", two accounts for the same person - a deactivated one and a
+# pending one), so an exact-1 requirement was too strict and showed "not
+# found" for a real, findable customer. But the fallback "recently
+# accessed" list above is also real (confirmed 2026-08-11) and needs to
+# stay rejected - it's just not been observed to be this small, so a low
+# cap distinguishes "a person with a couple of account records" from "the
+# generic recently-viewed list" without needing to open every row's own
+# detail page just to check whether it's even related to the searched
+# number (which _parse_all_results() doesn't have signal for from the
+# results grid alone).
+MAX_PLAUSIBLE_MATCHES = 5
 FIELD_RE = re.compile(r"^(Account|Subscriber Id|Account Status)\s*:\s*(.*)$")
 
 
@@ -70,14 +82,26 @@ def _select_account_find(driver, wait):
     # dropdown is located by checking each <select>'s options in Python
     # instead of trying to match the option text via XPath.
     wait.until(EC.presence_of_element_located((By.TAG_NAME, "select")))
+
+    # A <select> tag being present doesn't mean its options are populated
+    # yet - confirmed live 2026-08-19: the toolbar's dropdown can render
+    # empty for a moment before the "Account" option (and its siblings)
+    # get filled in, so a single immediate scan right after the tag itself
+    # appears can miss it. Re-scanning for up to 10s (same intermittent-
+    # slowness reasoning as _login()'s Siebel PRM link retry) instead of
+    # failing the whole search on the first empty pass.
     find_select, account_option = None, None
-    for s in driver.find_elements(By.TAG_NAME, "select"):
-        for o in s.find_elements(By.TAG_NAME, "option"):
-            if o.text.strip() == "Account":
-                find_select, account_option = s, o.text
+    deadline = time.time() + 10
+    while find_select is None and time.time() < deadline:
+        for s in driver.find_elements(By.TAG_NAME, "select"):
+            for o in s.find_elements(By.TAG_NAME, "option"):
+                if o.text.strip() == "Account":
+                    find_select, account_option = s, o.text
+                    break
+            if find_select:
                 break
-        if find_select:
-            break
+        if find_select is None:
+            time.sleep(0.5)
     if find_select is None:
         raise RuntimeError("Could not find the Find dropdown's Account option.")
     Select(find_select).select_by_visible_text(account_option)
@@ -91,20 +115,33 @@ def _select_account_find(driver, wait):
     ))
 
 
-def _parse_single_result(body_text):
+def _parse_all_results(body_text):
+    """
+    Returns a list of {"Account", "Subscriber Id", "Account Status"} dicts,
+    one per matched row in the quick-find results grid - [] if there's no
+    valid result-count line, or if the count is 0 or implausibly large (see
+    MAX_PLAUSIBLE_MATCHES). The three fields always appear in that fixed
+    order per row (confirmed live 2026-08-19), so a new dict starts every
+    time "Account Status" closes one out.
+    """
     count_match = RESULT_COUNT_RE.search(body_text)
-    if not count_match or count_match.group(1) != count_match.group(2) or count_match.group(2) != "1":
-        return None
+    if not count_match:
+        return []
+    total = int(count_match.group(3).rstrip("+")) if count_match.group(3).rstrip("+").isdigit() else None
+    if total == 0 or (total is not None and total > MAX_PLAUSIBLE_MATCHES):
+        return []
 
-    fields = {}
+    results = []
+    current = {}
     for line in body_text.splitlines():
         m = FIELD_RE.match(line.strip())
         if m:
-            fields[m.group(1)] = m.group(2).strip()
+            current[m.group(1)] = m.group(2).strip()
+            if m.group(1) == "Account Status":
+                results.append(current)
+                current = {}
 
-    if not fields:
-        return None
-    return fields
+    return results
 
 
 # Field labels on the account DETAIL form (reached by drilling into the one
@@ -238,13 +275,19 @@ def run_tataplay_single(mobile_number):
     """
     Logs into the Tata Play distributor SSO portal and runs a single Account
     quick-find by mobile number, returning
-    {"mobileNumber", "found", "accountName", "subscriberId", "accountStatus", "address", "lastRechargeDate"}
-    on an unambiguous single-account match, or {"mobileNumber", "found": False}
-    otherwise (no match, or an ambiguous multi-result fallback list - see
-    RESULT_COUNT_RE's comment). "address"/"lastRechargeDate" are best-effort -
-    each is its own extra page/tab load that can fail independently of the
-    search itself, so a found account with either one unreadable still comes
-    back as found with that field "" rather than failing the whole search.
+    {"mobileNumber", "found", "accounts": [{"accountName", "subscriberId",
+    "accountStatus", "address", "lastRechargeDate"}, ...]} on a match (one
+    entry per matched account - see _parse_all_results()' own comment on why
+    a search can genuinely match more than one), or {"mobileNumber",
+    "found": False} otherwise (no match, or an implausibly large result
+    count - see MAX_PLAUSIBLE_MATCHES). "address"/"lastRechargeDate" are
+    best-effort and only fetched for a single unambiguous match - each is
+    its own extra page/tab load, and doing that per account for a multi-
+    match result would mean drilling into one, then finding a reliable way
+    back to the results list to drill into the next, which hasn't been
+    exercised/verified live; a multi-match result's accounts carry "" for
+    both instead, same best-effort contract as a single match's unreadable
+    field.
     """
 
     driver = None
@@ -263,26 +306,43 @@ def run_tataplay_single(mobile_number):
         time.sleep(2)  # the results list re-renders client-side after the page "load" fires
 
         body_text = driver.find_element(By.TAG_NAME, "body").text
-        fields = _parse_single_result(body_text)
+        rows = _parse_all_results(body_text)
 
-        if not fields:
+        if not rows:
             return {"mobileNumber": mobile_number, "found": False}
 
-        try:
-            address = _open_account_detail_and_get_address(driver, wait)
-        except Exception:
-            address = ""
-
-        last_recharge_date = _get_last_recharge_date(driver, wait)
+        if len(rows) == 1:
+            fields = rows[0]
+            try:
+                address = _open_account_detail_and_get_address(driver, wait)
+            except Exception:
+                address = ""
+            last_recharge_date = _get_last_recharge_date(driver, wait)
+            return {
+                "mobileNumber": mobile_number,
+                "found": True,
+                "accounts": [{
+                    "accountName": fields.get("Account", ""),
+                    "subscriberId": fields.get("Subscriber Id", ""),
+                    "accountStatus": fields.get("Account Status", ""),
+                    "address": address,
+                    "lastRechargeDate": last_recharge_date,
+                }],
+            }
 
         return {
             "mobileNumber": mobile_number,
             "found": True,
-            "accountName": fields.get("Account", ""),
-            "subscriberId": fields.get("Subscriber Id", ""),
-            "accountStatus": fields.get("Account Status", ""),
-            "address": address,
-            "lastRechargeDate": last_recharge_date,
+            "accounts": [
+                {
+                    "accountName": fields.get("Account", ""),
+                    "subscriberId": fields.get("Subscriber Id", ""),
+                    "accountStatus": fields.get("Account Status", ""),
+                    "address": "",
+                    "lastRechargeDate": "",
+                }
+                for fields in rows
+            ],
         }
 
     finally:
