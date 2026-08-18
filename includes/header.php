@@ -77,13 +77,19 @@ if (hasPanIndiaProAccess()) {
 // actual access control. Labelled "Indian LPG Search" (not just "LPG
 // Search") now that HP LPG Search also exists, so the two aren't ambiguous
 // in the sidebar.
-if (hasLpgSearchAccess()) {
+if (false && hasLpgSearchAccess()) {
     // Single Search and Bulk Search used to be two separate pages/sidebar
     // entries (lpg_search.php / lpg_bulk_search.php); combined into one page
     // with mode tabs (2026-08-11, same tabbed pattern as hp_gas.php) since
     // both hit the same Flask backend and render an identical results table -
     // lpg_bulk_search.php now just redirects here with ?mode=bulk for any
     // old bookmarks/links.
+    //
+    // Sidebar link hidden per explicit instruction (2026-08-18) - the
+    // `false &&` above is deliberate so this is a one-line revert (just
+    // remove it) rather than deleting the block. hasLpgSearchAccess(),
+    // lpg_search.php, and lpg_search_api.php are untouched - a direct
+    // link/bookmark still works for anyone who already has access.
     $searchRegionsExtra[] = ['label' => 'Indian LPG Search', 'href' => 'lpg_search.php'];
 }
 // Dedicated single-purpose page for the "Indane Gas Info" tool
