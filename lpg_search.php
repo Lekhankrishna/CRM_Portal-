@@ -215,6 +215,23 @@ require __DIR__ . '/includes/header.php';
 </div>
 <?php endif; ?>
 
+<?php if (hasHpGasAccess()): ?>
+<!-- Manual, on-demand lookup against HP Gas Advanced's own dedicated
+     access + count-based monthly quota (hp_gas_access/hp_gas_monthly_limit
+     - same pattern as RC Print) - not auto-fetched, since firing it for
+     every LPG search would spend a search the agent didn't ask for.
+     Single Search mode only - hidden in Bulk Search by showMode() below. -->
+<div class="lpg-indane-wrap" id="lpgHpGasWrap">
+  <div class="lpg-indane-header">
+    <span class="lpg-indane-title"><i class="bi bi-fire"></i> HP Gas</span>
+    <button id="lpgHpGasBtn" class="lpg-btn lpg-btn-sm" type="button">Get HP Gas <span class="lpg-indane-cost">(150 credits)</span></button>
+  </div>
+  <div class="lpg-indane-status" id="lpgHpGasStatus"></div>
+  <div class="lpg-indane-quota" id="lpgHpGasQuota"></div>
+  <div class="lpg-indane-records" id="lpgHpGasRecords"></div>
+</div>
+<?php endif; ?>
+
 <script>
 const IS_ADMIN = <?= (currentUser()['role'] ?? '') === 'admin' ? 'true' : 'false' ?>;
 // 500 (not Infinity) even for admins - the backend (lpg_search.py's
@@ -255,6 +272,7 @@ const singleMode = document.getElementById("lpgSingleMode");
 const bulkMode = document.getElementById("lpgBulkMode");
 
 const indaneWrap = document.getElementById("lpgIndaneWrap"); // absent if the agent lacks the tool checkbox (Admin > Agents)
+const hpGasWrap = document.getElementById("lpgHpGasWrap"); // absent if the agent lacks HP Gas access
 
 function showMode(mode) {
   const isBulk = mode === "bulk";
@@ -263,6 +281,7 @@ function showMode(mode) {
   bulkMode.style.display = isBulk ? "" : "none";
   singleMode.style.display = isBulk ? "none" : "";
   if (indaneWrap) indaneWrap.style.display = isBulk ? "none" : "";
+  if (hpGasWrap) hpGasWrap.style.display = isBulk ? "none" : "";
 }
 tabSingle.addEventListener("click", () => showMode("single"));
 tabBulk.addEventListener("click", () => showMode("bulk"));
@@ -634,6 +653,109 @@ if (indaneBtn) {
       indaneStatus.textContent = INDANE_SERVER_DOWN_MESSAGE;
     } finally {
       indaneBtn.disabled = false;
+    }
+  });
+}
+
+// --- HP Gas panel - same shape as the Indane Gas panel above, just
+// pointed at tracing2_api.php's "hp-gas-advanced" tool (own dedicated
+// hp_gas_access/hp_gas_monthly_limit quota, same pattern as RC Print).
+// Helper functions duplicated rather than shared with the Indane block
+// above since that block (and these) only exist in the DOM/run at all
+// when the matching PHP access gate granted it - one agent could have
+// either, both, or neither.
+const hpGasBtn = document.getElementById("lpgHpGasBtn");
+if (hpGasBtn) {
+  const hpGasStatus = document.getElementById("lpgHpGasStatus");
+  const hpGasQuota = document.getElementById("lpgHpGasQuota");
+  const hpGasRecords = document.getElementById("lpgHpGasRecords");
+
+  const HPGAS_SERVER_DOWN_MESSAGE = "Server is down. Please try again later.";
+
+  function hpGasFieldIcon(label) {
+    const l = label.toLowerCase();
+    if (/(phone|mobile|node|number)/.test(l)) return "bi-telephone-fill";
+    if (/(address|location|city|state|pincode|circle)/.test(l)) return "bi-geo-alt-fill";
+    if (/name/.test(l)) return "bi-person-fill";
+    if (/(bank|account|ifsc)/.test(l)) return "bi-bank";
+    if (/(email|mail)/.test(l)) return "bi-envelope-fill";
+    if (/(aadhaar|pan|id|linkage|imei)/.test(l)) return "bi-credit-card-2-front-fill";
+    if (/(valid|verif|status|merchant)/.test(l)) return "bi-shield-check";
+    if (/(vpa|upi|credit)/.test(l)) return "bi-wallet2";
+    return "bi-info-circle-fill";
+  }
+
+  function buildHpGasRecordCard(record) {
+    const box = document.createElement("div");
+    box.className = "t2-record";
+
+    const header = document.createElement("div");
+    header.className = "t2-record-header";
+    const headerIcon = record.status ? "bi-person-circle" : "bi-folder2-open";
+    header.innerHTML = `<i class="bi ${headerIcon}"></i><span class="t2-record-name"></span><span class="t2-record-status"></span>`;
+    header.querySelector(".t2-record-name").textContent = record.name || "Record";
+    const statusBadge = header.querySelector(".t2-record-status");
+    if (record.status) { statusBadge.textContent = record.status; } else { statusBadge.remove(); }
+    box.appendChild(header);
+
+    const grid = document.createElement("div");
+    grid.className = "t2-field-grid";
+    (record.fields || []).forEach(field => {
+      const item = document.createElement("div");
+      item.className = "t2-field-item";
+      item.innerHTML = `<i class="bi"></i><div><div class="t2-field-label"></div><div class="t2-field-value"></div></div>`;
+      item.querySelector("i").classList.add(hpGasFieldIcon(field.label));
+      item.querySelector(".t2-field-label").textContent = field.label;
+      item.querySelector(".t2-field-value").textContent = field.value || "—";
+      grid.appendChild(item);
+    });
+    box.appendChild(grid);
+    return box;
+  }
+
+  hpGasBtn.addEventListener("click", async () => {
+    const number = numberBox.value.replace(/\D+/g, "");
+    if (!number) {
+      hpGasStatus.textContent = "Enter a mobile number above first.";
+      return;
+    }
+
+    hpGasBtn.disabled = true;
+    hpGasStatus.textContent = "Looking up HP Gas…";
+    hpGasRecords.innerHTML = "";
+
+    try {
+      const res = await fetch("tracing2_api.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tool: "hp-gas-advanced", query: number })
+      });
+      const data = await res.json();
+
+      if (res.status === 401) {
+        window.location.href = data.loginUrl || "login.php";
+        return;
+      }
+      if (typeof data.used === "number" && typeof data.limit === "number") {
+        const remaining = Math.max(0, data.limit - data.used);
+        hpGasQuota.textContent = `${remaining} of ${data.limit} ${data.unit || "searches"} left this month`;
+      }
+      if (!res.ok) {
+        hpGasStatus.textContent = HPGAS_SERVER_DOWN_MESSAGE;
+        return;
+      }
+
+      const records = (data.found && Array.isArray(data.records)) ? data.records : [];
+      if (records.length) {
+        hpGasStatus.textContent = `${records.length} result${records.length === 1 ? "" : "s"} found`;
+        records.forEach(r => hpGasRecords.appendChild(buildHpGasRecordCard(r)));
+      } else {
+        hpGasStatus.textContent = "No result found";
+      }
+    } catch (err) {
+      hpGasStatus.textContent = HPGAS_SERVER_DOWN_MESSAGE;
+    } finally {
+      hpGasBtn.disabled = false;
     }
   });
 }
