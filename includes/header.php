@@ -92,6 +92,17 @@ if (false && hasLpgSearchAccess()) {
     // link/bookmark still works for anyone who already has access.
     $searchRegionsExtra[] = ['label' => 'Indian LPG Search', 'href' => 'lpg_search.php'];
 }
+// HP LPG Search's own standalone page (hp_gas.php) never stopped working
+// after it was folded into Tracing 2.0 as a tab (2026-08-17) - only its
+// sidebar entry was removed at the time, on the assumption agents would
+// reach it via Tracing 2.0 instead. Re-added directly (2026-08-19) since
+// hasHpGasAccess() is already its own independent flag (same as RC Print),
+// not dependent on generic tracing2_access - an agent with only HP Gas
+// granted had no sidebar way to reach it while Tracing 2.0 itself was
+// hidden from them.
+if (hasHpGasAccess()) {
+    $searchRegionsExtra[] = ['label' => 'HP Gas', 'href' => 'hp_gas.php'];
+}
 // Dedicated single-purpose page for the "Indane Gas Info" tool
 // (indane_gas_info.php), placed directly below Indian LPG Search since
 // agents look up both for the same customer. Has its own dedicated access
