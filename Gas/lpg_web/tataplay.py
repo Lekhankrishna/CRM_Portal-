@@ -450,6 +450,15 @@ def run_tataplay_single(mobile_number):
             }
             try:
                 _open_nth_result_detail(driver, wait, i)
+                # document.readyState only covers the initial page
+                # structure - the Digicard/Asset grid loads via its own
+                # later, separate async call, confirmed live 2026-08-19 to
+                # sometimes still be empty several seconds after readyState
+                # already reports "complete". A flat head-start here (same
+                # "let client-side rendering catch up" reasoning as every
+                # other post-navigation sleep in this file) before polling
+                # starts, rather than relying on the poll alone to outlast it.
+                time.sleep(3)
                 account.update(_extract_account_details(driver, wait))
             except Exception:
                 pass  # best-effort - keep whatever list-level fields we already have
