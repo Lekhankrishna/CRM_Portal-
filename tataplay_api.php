@@ -110,13 +110,28 @@ if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decode
     // A search can genuinely match more than one account (see
     // tataplay.py's run_tataplay_single()) - archive each one; already
     // deduped per subscriber id + status inside archiveTataPlayResult()
-    // itself, so this is safe to call once per account.
+    // itself, so this is safe to call once per account. tataplay.py
+    // returns the address as separate fields now (Address Line 1/2,
+    // Village/Town/City, Town, District, Tahsil, State, Pin Code) - the
+    // archive's own CSV format stays a single "Address" column, built by
+    // joining them here rather than growing the CSV to match every new
+    // field this round added.
     foreach ($accounts as $account) {
+        $addressParts = array_filter([
+            $account['addressLine1'] ?? '',
+            $account['addressLine2'] ?? '',
+            $account['villageTownCity'] ?? '',
+            $account['town'] ?? '',
+            $account['district'] ?? '',
+            $account['tahsil'] ?? '',
+            $account['state'] ?? '',
+            $account['pinCode'] ?? '',
+        ], fn($v) => $v !== '');
         archiveTataPlayResult(
             $account['accountName'] ?? '',
             $account['subscriberId'] ?? '',
             $account['accountStatus'] ?? '',
-            $account['address'] ?? '',
+            implode(', ', $addressParts),
             $account['lastRechargeDate'] ?? '',
             currentUser()['username'] ?? 'unknown',
             $mobileNumber

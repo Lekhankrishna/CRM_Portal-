@@ -1,7 +1,7 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
 
 import re
 import time
@@ -144,42 +144,169 @@ def _parse_all_results(body_text):
     return results
 
 
-# Field labels on the account DETAIL form (reached by drilling into the one
-# quick-find result) that make up a postal address - confirmed 2026-08-16
-# from a real account. Read via aria-label rather than title/name: these
-# inputs don't expose a title attribute the way the quick-find's own search
-# fields do.
-ADDRESS_ARIA_LABELS = ["Address Line 1", "Address Line 2", "Village/Town/City", "District", "State", "Pin Code"]
+# Field labels on the account DETAIL form (reached by drilling into a
+# quick-find result) covering everything under the real portal's own
+# "Subscriber Details" and "Address" headings - confirmed live 2026-08-19
+# from a real account's aria-labeled inputs (a superset of the original
+# 2026-08-16 address-only set: Town/Tahsil were missing from that one).
+# Read via aria-label rather than title/name: these inputs don't expose a
+# title attribute the way the quick-find's own search fields do.
+DETAIL_ARIA_LABELS = [
+    "Account Type", "Account Category", "Account Sub-Category", "Sales Segment",
+    "Address Line 1", "Address Line 2", "Village/Town/City", "Town", "District", "Tahsil", "State", "Pin Code",
+]
 
 
-def _open_account_detail_and_get_address(driver, wait):
+def _open_nth_result_detail(driver, wait, index):
     """
-    Drills into the single quick-find result (a Siebel "drilldown" link that
-    Selenium considers not-interactable via a normal .click() - it's styled
-    TSLDisplayNone - so this fires the click via JS instead) and reads the
-    account detail form's address fields. Returns a formatted address string,
-    or "" if the detail page didn't load the expected fields in time.
+    Drills into the (0-based) index'th row of the current quick-find
+    results grid - a Siebel "drilldown" link Selenium considers not-
+    interactable via a normal .click() (it's styled TSLDisplayNone), so
+    this fires the click via JS instead. Row order is stable across a
+    driver.back() back to the same results grid (confirmed live
+    2026-08-19), which is what makes visiting every row of a multi-match
+    result - back to the list, into the next row - workable at all.
     """
-    link = wait.until(EC.presence_of_element_located((By.XPATH, "//a[@name='Title']")))
-    driver.execute_script("arguments[0].click();", link)
-
+    links = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//a[@name='Title']")))
+    driver.execute_script("arguments[0].click();", links[index])
     wait.until(lambda d: d.execute_script("return document.readyState") == "complete")
 
-    deadline = time.time() + 15
-    values = {}
-    while time.time() < deadline:
-        for label in ADDRESS_ARIA_LABELS:
-            if label in values:
-                continue
-            els = driver.find_elements(By.CSS_SELECTOR, f"input[aria-label='{label}']")
-            if els:
-                values[label] = els[0].get_attribute("value") or ""
-        if len(values) == len(ADDRESS_ARIA_LABELS):
+
+def _read_jqgrid_first_row(driver, header_must_contain):
+    """
+    Finds the jqGrid whose header text contains every string in
+    header_must_contain and returns its first body row as a
+    {column_label: value} dict (used for the Digicard/Asset grid, which -
+    unlike Billing Portal's Transaction History - only ever has the one
+    active box to read, not a history to scan for the latest of some
+    type). Returns {} if no matching header, or that grid has no body rows.
+
+    The matching header's own body table is found via the "next
+    ui-jqgrid-btable following this header in document order" XPath rather
+    than _get_last_recharge_date()'s positional all_header_tables[i] <->
+    all_body_tables[i] pairing - confirmed live 2026-08-19 that an account
+    detail page can carry a second, hidden jqGrid left over from the
+    search-results grid used to drill into it (a "Title"-only header with
+    no body table of its own at all), which throws that positional pairing
+    off by one for every real grid after it.
+    """
+    header_table = None
+    for t in driver.find_elements(By.CSS_SELECTOR, "table.ui-jqgrid-htable"):
+        if all(h in t.text for h in header_must_contain):
+            header_table = t
             break
+    if header_table is None:
+        return {}
+
+    header_cells = [c.text.strip() for c in header_table.find_elements(By.TAG_NAME, "th")] \
+        or [c.text.strip() for c in header_table.find_elements(By.TAG_NAME, "td")]
+
+    body_tables = header_table.find_elements(By.XPATH, "following::table[contains(@class,'ui-jqgrid-btable')][1]")
+    if not body_tables:
+        return {}
+    body_table = body_tables[0]
+
+    for row in body_table.find_elements(By.TAG_NAME, "tr"):
+        cells = row.find_elements(By.TAG_NAME, "td")
+        if len(cells) < len(header_cells):
+            continue
+        return {header_cells[i]: cells[i].text.strip() for i in range(len(header_cells)) if header_cells[i]}
+    return {}
+
+
+def _extract_account_details(driver, wait):
+    """
+    Reads the currently-open account detail page's Subscriber Details/
+    Address fields (DETAIL_ARIA_LABELS) and its Digicard/Asset grid row,
+    plus a best-effort Last Recharge Date from the Billing Portal tab (see
+    _get_last_recharge_date()). Each group is read independently and best-
+    effort - an exception or missing field in one doesn't block the
+    others, same "" -on-failure contract the single-account path always
+    had for address/lastRechargeDate.
+    """
+    details = {}
+
+    # Re-reads every field on every pass rather than caching the first
+    # non-empty value seen per label - confirmed live 2026-08-19, drilling
+    # into a second account right after the first: these aria-labeled
+    # inputs don't get replaced (no StaleElementReferenceException), their
+    # VALUE attribute just updates asynchronously a moment after
+    # navigation completes, so an early pass can read the PREVIOUS
+    # account's still-lingering values and (with a cache-on-first-find
+    # loop) lock them in permanently. Two consecutive identical passes is
+    # treated as "stopped changing, safe to use"; each individual
+    # find_elements() call still tolerates a StaleElementReferenceException
+    # (this page can also genuinely swap nodes out from under a read mid-
+    # poll, same failure mode already handled in tracing2_tools.py's own
+    # polling loop) without aborting the whole pass.
+    deadline = time.time() + 15
+    values, previous = {}, None
+    while time.time() < deadline:
+        current = {}
+        try:
+            for label in DETAIL_ARIA_LABELS:
+                els = driver.find_elements(By.CSS_SELECTOR, f"input[aria-label='{label}']")
+                if els:
+                    current[label] = (els[0].get_attribute("value") or "").strip()
+        except StaleElementReferenceException:
+            pass
+        values = current
+        if current and current == previous:
+            break
+        previous = current
         time.sleep(0.5)
 
-    parts = [values.get(label, "").strip() for label in ADDRESS_ARIA_LABELS]
-    return ", ".join(p for p in parts if p)
+    details["accountType"] = values.get("Account Type", "")
+    details["accountCategory"] = values.get("Account Category", "")
+    details["accountSubCategory"] = values.get("Account Sub-Category", "")
+    details["salesSegment"] = values.get("Sales Segment", "")
+    details["addressLine1"] = values.get("Address Line 1", "")
+    details["addressLine2"] = values.get("Address Line 2", "")
+    details["villageTownCity"] = values.get("Village/Town/City", "")
+    details["town"] = values.get("Town", "")
+    details["district"] = values.get("District", "")
+    details["tahsil"] = values.get("Tahsil", "")
+    details["state"] = values.get("State", "")
+    details["pinCode"] = values.get("Pin Code", "")
+
+    # The Digicard/Asset grid is present on page load without needing a
+    # tab click (unlike Billing Portal - confirmed live 2026-08-19 that
+    # clicking the visible "Assets" tab instead swaps in a completely
+    # different, broader grid with its own column set, not this one), but
+    # it can render asynchronously a moment after the aria-labeled fields
+    # above are already readable - and confirmed live, the header row can
+    # be present with every cell still blank a moment before the real
+    # values land, so a match needs at least one non-empty value, not just
+    # a header/row match, before it's trusted. Same stability-across-two-
+    # passes reasoning as the aria fields above once it does have data.
+    digicard, previous = {}, None
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        try:
+            candidate = _read_jqgrid_first_row(driver, ["Product", "Digicard #"])
+        except StaleElementReferenceException:
+            candidate = {}
+        if not any(candidate.values()):
+            candidate = {}
+        digicard = candidate
+        if digicard and digicard == previous:
+            break
+        previous = digicard
+        time.sleep(0.5)
+    details["digicardProduct"] = digicard.get("Product", "")
+    details["digicardNumber"] = digicard.get("Digicard #", "")
+    details["digicompNumber"] = digicard.get("Digicomp #", "")
+    details["digicardType"] = digicard.get("Digicard Type", "")
+    details["digicardStatus"] = digicard.get("Status", "")
+    details["digicardEffectiveStartDate"] = digicard.get("Effective Start Date", "")
+    details["digicompSerialNumber"] = digicard.get("DigiComp Mfg. Serial Number", "")
+    details["assetType"] = digicard.get("Asset Type", "")
+
+    try:
+        details["lastRechargeDate"] = _get_last_recharge_date(driver, wait)
+    except Exception:
+        details["lastRechargeDate"] = ""
+    return details
 
 
 # jqGrid renders each grid as a HEADER <table class="ui-jqgrid-htable"> right
@@ -274,20 +401,23 @@ def _get_last_recharge_date(driver, wait):
 def run_tataplay_single(mobile_number):
     """
     Logs into the Tata Play distributor SSO portal and runs a single Account
-    quick-find by mobile number, returning
-    {"mobileNumber", "found", "accounts": [{"accountName", "subscriberId",
-    "accountStatus", "address", "lastRechargeDate"}, ...]} on a match (one
-    entry per matched account - see _parse_all_results()' own comment on why
-    a search can genuinely match more than one), or {"mobileNumber",
-    "found": False} otherwise (no match, or an implausibly large result
-    count - see MAX_PLAUSIBLE_MATCHES). "address"/"lastRechargeDate" are
-    best-effort and only fetched for a single unambiguous match - each is
-    its own extra page/tab load, and doing that per account for a multi-
-    match result would mean drilling into one, then finding a reliable way
-    back to the results list to drill into the next, which hasn't been
-    exercised/verified live; a multi-match result's accounts carry "" for
-    both instead, same best-effort contract as a single match's unreadable
-    field.
+    quick-find by mobile number, returning {"mobileNumber", "found",
+    "accounts": [{"accountName", "subscriberId", "accountStatus",
+    "accountType", "accountCategory", "accountSubCategory", "salesSegment",
+    "addressLine1", "addressLine2", "villageTownCity", "town", "district",
+    "tahsil", "state", "pinCode", "digicardProduct", "digicardNumber",
+    "digicompNumber", "digicardType", "digicardStatus",
+    "digicardEffectiveStartDate", "digicompSerialNumber", "assetType",
+    "lastRechargeDate"}, ...]} on a match (one entry per matched account -
+    see _parse_all_results()' own comment on why a search can genuinely
+    match more than one), or {"mobileNumber", "found": False} otherwise (no
+    match, or an implausibly large result count - see
+    MAX_PLAUSIBLE_MATCHES). Every field past accountStatus is best-effort
+    (see _extract_account_details()) - drilling into one account, reading
+    it, and going back to the list (confirmed live 2026-08-19 that
+    driver.back() lands cleanly back on the same results grid, same row
+    order) to drill into the next happens for every matched account, not
+    just a single unambiguous one.
     """
 
     driver = None
@@ -311,39 +441,28 @@ def run_tataplay_single(mobile_number):
         if not rows:
             return {"mobileNumber": mobile_number, "found": False}
 
-        if len(rows) == 1:
-            fields = rows[0]
-            try:
-                address = _open_account_detail_and_get_address(driver, wait)
-            except Exception:
-                address = ""
-            last_recharge_date = _get_last_recharge_date(driver, wait)
-            return {
-                "mobileNumber": mobile_number,
-                "found": True,
-                "accounts": [{
-                    "accountName": fields.get("Account", ""),
-                    "subscriberId": fields.get("Subscriber Id", ""),
-                    "accountStatus": fields.get("Account Status", ""),
-                    "address": address,
-                    "lastRechargeDate": last_recharge_date,
-                }],
+        accounts = []
+        for i, fields in enumerate(rows):
+            account = {
+                "accountName": fields.get("Account", ""),
+                "subscriberId": fields.get("Subscriber Id", ""),
+                "accountStatus": fields.get("Account Status", ""),
             }
+            try:
+                _open_nth_result_detail(driver, wait, i)
+                account.update(_extract_account_details(driver, wait))
+            except Exception:
+                pass  # best-effort - keep whatever list-level fields we already have
+            if i < len(rows) - 1:
+                try:
+                    driver.back()
+                    wait.until(lambda d: d.execute_script("return document.readyState") == "complete")
+                    time.sleep(1)
+                except Exception:
+                    pass
+            accounts.append(account)
 
-        return {
-            "mobileNumber": mobile_number,
-            "found": True,
-            "accounts": [
-                {
-                    "accountName": fields.get("Account", ""),
-                    "subscriberId": fields.get("Subscriber Id", ""),
-                    "accountStatus": fields.get("Account Status", ""),
-                    "address": "",
-                    "lastRechargeDate": "",
-                }
-                for fields in rows
-            ],
-        }
+        return {"mobileNumber": mobile_number, "found": True, "accounts": accounts}
 
     finally:
         if driver is not None:

@@ -64,6 +64,12 @@ require __DIR__ . '/includes/header.php';
   .tp-section{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;}
   .tp-section-title{padding:10px 16px;background:#4f46e5;color:#fff;font-size:11.5px;font-weight:700;
     text-transform:uppercase;letter-spacing:.4px;}
+  /* One card (.tp-section) holds three of these groups - Subscriber
+     Details/Address/Digicard, same breakdown the real portal itself
+     shows (confirmed live 2026-08-19) - each with its own small heading
+     and field table rather than one flat list of ~20 rows. */
+  .tp-subsection-title{padding:10px 16px 4px;font-size:10.5px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.4px;color:#4f46e5;}
   .tp-section-table{width:100%;border-collapse:collapse;}
   .tp-section-table tr:nth-child(odd){background:#fff;}
   .tp-section-table tr:nth-child(even){background:#f8f8fc;}
@@ -176,29 +182,13 @@ function statusChipClass(status) {
 // number (confirmed live 2026-08-19 - a deactivated account and a pending
 // one for the same person) - each gets its own card instead of assuming
 // there's only ever one, same shape as Gas/lpg_web/tataplay.py's
-// run_tataplay_single(). address/lastRechargeDate come back "" for a
-// multi-match result (see that function's own comment on why), so those
-// two rows just show as empty rather than being hidden entirely - keeps
-// the field list the same shape whether it's a single match or several.
-function buildAccountCard(account, heading) {
-  const box = document.createElement("div");
-  box.className = "tp-section";
-  const title = document.createElement("div");
-  title.className = "tp-section-title";
-  title.textContent = heading;
-  box.appendChild(title);
-
+// run_tataplay_single(). Each card is split into the same three groups
+// the real Tata Play portal itself shows (confirmed live 2026-08-19):
+// Subscriber Details, Address, and the Digicard/set-top-box record.
+function buildFieldTable(rows) {
   const table = document.createElement("table");
   table.className = "tp-section-table";
   const tbody = document.createElement("tbody");
-
-  const rows = [
-    ["Account Name", account.accountName],
-    ["Subscriber Id", account.subscriberId],
-    ["Account Status", account.accountStatus],
-    ["Address", account.address],
-    ["Last Recharge Date", account.lastRechargeDate],
-  ];
   rows.forEach(([label, value]) => {
     const tr = document.createElement("tr");
     const labelTd = document.createElement("td");
@@ -206,7 +196,7 @@ function buildAccountCard(account, heading) {
     labelTd.textContent = label;
     const valueTd = document.createElement("td");
     valueTd.className = "tp-field-value";
-    if (label === "Account Status") {
+    if (label === "Status" || label === "Digicard Status") {
       const chip = document.createElement("span");
       chip.className = "tp-status-chip " + statusChipClass(value);
       chip.textContent = value || "—";
@@ -217,9 +207,64 @@ function buildAccountCard(account, heading) {
     tr.append(labelTd, valueTd);
     tbody.appendChild(tr);
   });
-
   table.appendChild(tbody);
-  box.appendChild(table);
+  return table;
+}
+
+function buildSubsectionHeading(text) {
+  const h = document.createElement("div");
+  h.className = "tp-subsection-title";
+  h.textContent = text;
+  return h;
+}
+
+function buildAccountCard(account, heading) {
+  const box = document.createElement("div");
+  box.className = "tp-section";
+  const title = document.createElement("div");
+  title.className = "tp-section-title";
+  title.textContent = heading;
+  box.appendChild(title);
+
+  box.appendChild(buildSubsectionHeading("Subscriber Details"));
+  box.appendChild(buildFieldTable([
+    ["Subscriber Name", account.accountName],
+    ["Subscriber Id", account.subscriberId],
+    ["Status", account.accountStatus],
+    ["Account Type", account.accountType],
+    ["Account Category", account.accountCategory],
+    ["Account Sub-Category", account.accountSubCategory],
+    ["Sales Segment", account.salesSegment],
+  ]));
+
+  box.appendChild(buildSubsectionHeading("Address"));
+  box.appendChild(buildFieldTable([
+    ["Address Line 1", account.addressLine1],
+    ["Address Line 2", account.addressLine2],
+    ["Village/Town/City", account.villageTownCity],
+    ["Town", account.town],
+    ["District", account.district],
+    ["Tahsil", account.tahsil],
+    ["State", account.state],
+    ["Pin Code", account.pinCode],
+  ]));
+
+  const digicardHeading = account.digicardNumber
+    ? `Digicard (${account.digicardNumber})`
+    : "Digicard";
+  box.appendChild(buildSubsectionHeading(digicardHeading));
+  box.appendChild(buildFieldTable([
+    ["Product", account.digicardProduct],
+    ["Digicard #", account.digicardNumber],
+    ["Digicomp #", account.digicompNumber],
+    ["Digicard Type", account.digicardType],
+    ["Digicard Status", account.digicardStatus],
+    ["Effective Start Date", account.digicardEffectiveStartDate],
+    ["DigiComp Mfg. Serial Number", account.digicompSerialNumber],
+    ["Asset Type", account.assetType],
+    ["Last Recharge Date", account.lastRechargeDate],
+  ]));
+
   return box;
 }
 
