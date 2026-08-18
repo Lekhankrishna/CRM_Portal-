@@ -1,6 +1,7 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 
 import re
 import time
@@ -41,7 +42,17 @@ def _login(driver, wait):
     # fires that handler, so this needs a window-handle switch afterward
     # rather than following an href directly.
     original_handles = driver.window_handles
-    prm_link = wait.until(EC.presence_of_element_located((By.XPATH, "//a[contains(.,'Siebel PRM')]")))
+    # Confirmed intermittent (2026-08-18, search_type='tataplay' 502s in
+    # service_error.log): most logins find this link within the normal 20s
+    # wait, but a few timed out here even though the surrounding logins
+    # (same credentials, same portal, minutes apart) succeeded - looks like
+    # occasional slowness on the portal's side rather than a DOM/selector
+    # change, so one retry (a fresh 20s window) rather than failing the
+    # whole search on the first timeout.
+    try:
+        prm_link = wait.until(EC.presence_of_element_located((By.XPATH, "//a[contains(.,'Siebel PRM')]")))
+    except TimeoutException:
+        prm_link = wait.until(EC.presence_of_element_located((By.XPATH, "//a[contains(.,'Siebel PRM')]")))
     prm_link.click()
 
     wait.until(lambda d: len(d.window_handles) > len(original_handles))
