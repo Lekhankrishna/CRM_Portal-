@@ -92,6 +92,13 @@ if (false && hasLpgSearchAccess()) {
     // link/bookmark still works for anyone who already has access.
     $searchRegionsExtra[] = ['label' => 'Indian LPG Search', 'href' => 'lpg_search.php'];
 }
+// RC Print's own standalone page (rc_print.php) never stopped working
+// after it was folded into Tracing 2.0 as a tab (2026-08-17) - same
+// re-add reasoning as HP Gas right below: hasRcPrintAccess() is its own
+// independent flag, not dependent on generic tracing2_access.
+if (hasRcPrintAccess()) {
+    $searchRegionsExtra[] = ['label' => 'RC Print', 'href' => 'rc_print.php'];
+}
 // HP LPG Search's own standalone page (hp_gas.php) never stopped working
 // after it was folded into Tracing 2.0 as a tab (2026-08-17) - only its
 // sidebar entry was removed at the time, on the assumption agents would
