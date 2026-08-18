@@ -86,6 +86,16 @@ if (hasLpgSearchAccess()) {
     // old bookmarks/links.
     $searchRegionsExtra[] = ['label' => 'Indian LPG Search', 'href' => 'lpg_search.php'];
 }
+// Dedicated single-purpose page for the "Indane Gas Info" tool
+// (indane_gas_info.php), placed directly below Indian LPG Search since
+// agents look up both for the same customer. Has its own dedicated access
+// flag + count-based monthly quota (indane_gas_access, promoted out of the
+// generic Tracing 2.0 per-tool checklist 2026-08-18 - see
+// includes/tracing2_tools.php's own comment on why), same pattern as RC
+// Print/HP LPG Search.
+if (hasIndaneGasAccess()) {
+    $searchRegionsExtra[] = ['label' => 'Indane Gas', 'href' => 'indane_gas_info.php'];
+}
 // Tata Play is opt-in per account (Admin > Agents > "Tata Play Access") -
 // same pattern as HP LPG Search above (own tataplay.py Selenium automation
 // against the distributor's mysso.tataplay.com SSO login, proxied through

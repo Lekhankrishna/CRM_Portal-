@@ -24,6 +24,12 @@
 // standalone pages did. tracing2SelectableTools() below excludes both from
 // the per-tool checklist for the same reason - they're managed by their
 // own existing checkboxes in Admin > Agents, not this new one.
+//
+// indane-gas-info was promoted the same way (2026-08-18) - it used to be a
+// generic per-tool-checklist entry, but is common/important enough to get
+// its own dedicated Feature Access checkbox + count-based monthly quota
+// (indane_gas_access/indane_gas_monthly_limit, migrate_add_indane_gas_access.sql)
+// instead of drawing from the shared tracing2_monthly_limit credit budget.
 const TRACING2_TOOLS = [
     'mobile-info'             => ['label' => 'Mobile Info',            'placeholder' => 'Enter Mobile Number',   'credits' => 100],
     'rc-print'                => ['label' => 'RC PRINT',               'placeholder' => 'Enter Vehicle Number',  'credits' => 150, 'requiresAccess' => 'rc_print'],
@@ -39,7 +45,7 @@ const TRACING2_TOOLS = [
     'aadhaar-to-pan'          => ['label' => 'Aadhaar to PAN',         'placeholder' => 'Enter Aadhaar Number',  'credits' => 50],
     'pan-to-gst'              => ['label' => 'PAN to GST',             'placeholder' => 'e.g. ARCPV7418G',       'credits' => 15],
     'vehicle-to-number'       => ['label' => 'Vehicle to Number',      'placeholder' => 'e.g. UP70HQ2225',       'credits' => 50],
-    'indane-gas-info'         => ['label' => 'Indane Gas Info',        'placeholder' => 'Enter 10-digit Number', 'credits' => 100],
+    'indane-gas-info'         => ['label' => 'Indane Gas',             'placeholder' => 'Enter 10-digit Number', 'credits' => 100, 'requiresAccess' => 'indane_gas'],
     'indane-gas-verification' => ['label' => 'Indane Gas v2',          'placeholder' => 'Enter Mobile Number',   'credits' => 75],
     'bharat-gas-info'         => ['label' => 'Bharat Gas Info',        'placeholder' => 'Enter Number',          'credits' => null],
     'gmail-info'              => ['label' => 'Gmail Info',             'placeholder' => 'example@gmail.com',     'credits' => 35],
@@ -74,4 +80,17 @@ const TRACING2_UNKNOWN_COST_CREDITS = 30;
 function tracing2CreditsFor(string $toolSlug): int {
     $credits = TRACING2_TOOLS[$toolSlug]['credits'] ?? null;
     return $credits ?? TRACING2_UNKNOWN_COST_CREDITS;
+}
+
+// Same as tracing2CreditsFor(), but checks the searching agent's own
+// per-tool override first (Admin > Agents > "Tracing 2.0 — Select Tools",
+// users.tracing2_tool_credits - see migrate_add_tracing2_tool_credits.sql
+// and getUserTracing2ToolCredits()). $userOverrides is null (agent has
+// never had any overrides saved) or a partial slug => credits map; a slug
+// missing from that map still falls back to the global default.
+function tracing2CreditsForUser(string $toolSlug, ?array $userOverrides): int {
+    if ($userOverrides !== null && isset($userOverrides[$toolSlug])) {
+        return (int) $userOverrides[$toolSlug];
+    }
+    return tracing2CreditsFor($toolSlug);
 }

@@ -6,7 +6,13 @@
 // locateme.services or Flask directly, and the locateme.services login
 // lives in Gas/lpg_web/rc_print.py, not in this app's database.
 require __DIR__ . '/includes/auth.php';
-requireTracing2Access();
+// Not requireTracing2Access() here - rc-print/hp-gas/indane-gas each have
+// their OWN independent access flag (checked below, per-tool, in the
+// switch) and must work for an agent who has THAT flag but not the
+// generic "Tracing 2.0" one. Every other tool still ends up gated on
+// tracing2_access regardless, since hasTracing2ToolAccess() (the
+// default-case check below) already requires it internally.
+requireLogin();
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/includes/tracing2_archive.php';
 require_once __DIR__ . '/includes/tracing2_tools.php';
@@ -85,6 +91,16 @@ switch ($requiresAccess) {
         $searchType  = 'hp_gas';
         $limitLabel  = 'HP LPG Search';
         break;
+    case 'indane_gas':
+        if (!hasIndaneGasAccess()) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Indane Gas access has not been granted for this account.']);
+            exit;
+        }
+        $limitColumn = 'indane_gas_monthly_limit';
+        $searchType  = 'indane_gas';
+        $limitLabel  = 'Indane Gas';
+        break;
     default:
         // Per-tool checklist (Admin > Agents > "Tracing 2.0" -> expandable
         // tool list, see migrate_add_locate_me_tools.sql) - on top of the
@@ -112,7 +128,12 @@ switch ($requiresAccess) {
 // instead - each is a single fixed-cost tool (150 credits every time), so
 // a search count there is already just a constant multiple of credits,
 // and their existing admin-facing "N/month" limits predate this change.
-$creditsSpent  = tracing2CreditsFor($tool);
+// Per-agent override (Admin > Agents > "Tracing 2.0 — Select Tools", each
+// tool's own credit-cost input) takes precedence over the global default -
+// rc-print/hp-gas-advanced are never in that per-agent map (excluded from
+// the checklist, see includes/tracing2_tools.php), so they always fall
+// through to their fixed 150-credit global cost regardless.
+$creditsSpent  = tracing2CreditsForUser($tool, getUserTracing2ToolCredits());
 $quotaIsCredits = ($requiresAccess === null);
 $quotaUnit      = $quotaIsCredits ? 'credits' : 'searches';
 $quotaSql = $quotaIsCredits

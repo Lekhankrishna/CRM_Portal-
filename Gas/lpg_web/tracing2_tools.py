@@ -60,7 +60,7 @@ TOOL_REGISTRY = {
     "aadhaar-to-pan":            {"label": "Aadhaar to PAN",           "placeholder": "e.g. 712481196833",     "credits": 50},
     "pan-to-gst":                {"label": "PAN to GST",               "placeholder": "e.g. ARCPV7418G",       "credits": 15},
     "vehicle-to-number":         {"label": "Vehicle to Number",        "placeholder": "e.g. UP70HQ2225",       "credits": 50},
-    "indane-gas-info":           {"label": "Indane Gas Info",          "placeholder": "Enter 10-digit number", "credits": 100},
+    "indane-gas-info":           {"label": "Indane Gas",               "placeholder": "Enter 10-digit number", "credits": 100},
     "indane-gas-verification":   {"label": "Indane Gas v2",            "placeholder": "Enter mobile number",   "credits": 75},
     "bharat-gas-info":           {"label": "Bharat Gas Info",          "placeholder": "Enter Number",          "credits": None},
     "gmail-info":                {"label": "Gmail Info",               "placeholder": "example@gmail.com",     "credits": 35},

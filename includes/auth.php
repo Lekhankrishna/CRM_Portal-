@@ -120,6 +120,25 @@ function getUserTracing2Tools(): ?array {
     return $tools;
 }
 
+// Per-agent credit-cost overrides set in Admin > Agents (see
+// migrate_add_tracing2_tool_credits.sql). NULL means "no overrides at all
+// for this agent" - every tool falls back to includes/tracing2_tools.php's
+// global default (tracing2CreditsFor()). A real array is a partial map
+// (slug => credits); a slug missing from it still falls back to the
+// global default too - see tracing2CreditsForUser() for how callers
+// should combine the two.
+function getUserTracing2ToolCredits(): ?array {
+    global $pdo;
+    if (!isLoggedIn()) return null;
+    static $credits = 'unset';
+    if ($credits !== 'unset') return $credits;
+    $stmt = $pdo->prepare('SELECT tracing2_tool_credits FROM users WHERE id = :id');
+    $stmt->execute(['id' => $_SESSION['user_id']]);
+    $raw = $stmt->fetchColumn();
+    $credits = ($raw === null || $raw === false) ? null : (json_decode((string) $raw, true) ?: []);
+    return $credits;
+}
+
 // Gates an individual Tracing 2.0 tool (e.g. 'mobile-info', 'upi-finder') -
 // separate from hasTracing2Access(), which only gates the page as a whole.
 // Admins bypass this (same as every other per-search quota/access check in
@@ -156,6 +175,33 @@ function requireRcPrintAccess(string $loginPath = 'login.php'): void {
     if (!hasRcPrintAccess()) {
         http_response_code(403);
         die('Access denied: RC Print access has not been granted for this account.');
+    }
+}
+
+// Same pattern as hasRcPrintAccess() - checked fresh from the DB every
+// request so a revoke from Admin > Agents takes effect immediately. Defaults
+// to NOT granted (see migrate_add_indane_gas_access.sql). Indane Gas Info
+// used to live under the generic Tracing 2.0 per-tool checklist
+// (hasTracing2ToolAccess('indane-gas-info')) - promoted to its own
+// dedicated access flag + count-based monthly quota (2026-08-18), same
+// shape as RC Print/HP Gas Advanced, so it no longer draws from the shared
+// tracing2_monthly_limit credit budget.
+function hasIndaneGasAccess(): bool {
+    global $pdo;
+    if (!isLoggedIn()) return false;
+    static $access = null;
+    if ($access !== null) return $access;
+    $stmt = $pdo->prepare('SELECT indane_gas_access FROM users WHERE id = :id');
+    $stmt->execute(['id' => $_SESSION['user_id']]);
+    $access = (bool) $stmt->fetchColumn();
+    return $access;
+}
+
+function requireIndaneGasAccess(string $loginPath = 'login.php'): void {
+    requireLogin($loginPath);
+    if (!hasIndaneGasAccess()) {
+        http_response_code(403);
+        die('Access denied: Indane Gas access has not been granted for this account.');
     }
 }
 

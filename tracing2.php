@@ -35,7 +35,7 @@ require __DIR__ . '/includes/header.php';
 <div class="confetti-container" id="confetti-container"></div>
 
 <div class="page-header" style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
-  <h1 class="page-title" style="margin:0"><i class="bi bi-geo-alt-fill"></i> Tracing 2.0</h1>
+  <h1 class="page-title" style="margin:0"><i class="bi bi-geo-alt-fill"></i> <span id="t2PageTitleText">Tracing 2.0</span></h1>
   <?php if ($isAdmin): ?>
     <span id="t2QuotaBadge" class="badge badge-neutral" style="margin-left:auto">Unlimited (Admin)</span>
   <?php elseif ($quota !== null): ?>
@@ -119,7 +119,10 @@ require __DIR__ . '/includes/header.php';
 
 <div class="t2-card">
   <div class="t2-card-body">
-    <p class="t2-hint">Pick a tool, then enter the matching value to search.</p>
+    <p class="t2-hint" id="t2Hint">Pick a tool, then enter the matching value to search.</p>
+    <button id="t2ChangeToolBtn" class="t2-btn t2-btn-secondary" type="button" style="display:none;margin-bottom:14px">
+      <i class="bi bi-arrow-left"></i> Change tool
+    </button>
     <?php
     // Restricting an agent to a subset of tools (per-tool checklist below)
     // can mean mobile-info itself isn't in their allowed list - the first
@@ -138,6 +141,7 @@ require __DIR__ . '/includes/header.php';
         $requires = $toolDef['requiresAccess'] ?? null;
         if ($requires === 'rc_print' && !hasRcPrintAccess()) continue;
         if ($requires === 'hp_gas' && !hasHpGasAccess()) continue;
+        if ($requires === 'indane_gas' && !hasIndaneGasAccess()) continue;
         if ($requires === null && !hasTracing2ToolAccess($slug)) continue;
         if ($firstVisibleTool === null) $firstVisibleTool = ['slug' => $slug, 'placeholder' => $toolDef['placeholder']];
       ?>
@@ -232,13 +236,46 @@ function formatDuration(seconds) {
 // see includes/tracing2_tools.php for the full list, mirrored server-side
 // in Gas/lpg_web/tracing2_tools.py's TOOL_REGISTRY.
 let activeTool = "<?= htmlspecialchars($firstVisibleTool['slug'] ?? '', ENT_QUOTES) ?>";
-toolTabs.querySelectorAll(".t2-tab").forEach(tab => tab.addEventListener("click", () => {
+const pageTitleText = document.getElementById("t2PageTitleText");
+const hintEl         = document.getElementById("t2Hint");
+const changeToolBtn  = document.getElementById("t2ChangeToolBtn");
+
+// Clicking a tab focuses that single tool - the other 23 tabs and the
+// generic "Tracing 2.0" heading are just clutter once an agent has already
+// picked one (same idea as the dedicated single-tool pages, e.g.
+// indane_gas_info.php, just without a separate PHP file per tool). The
+// full tab bar still shows on first load so there's something to pick
+// from, and "Change tool" brings it back.
+function selectTool(tab) {
   toolTabs.querySelectorAll(".t2-tab").forEach(t => t.classList.remove("active"));
   tab.classList.add("active");
   activeTool = tab.dataset.tool;
   queryBox.placeholder = tab.dataset.placeholder;
   statusEl.textContent = "";
-}));
+  pageTitleText.textContent = tab.textContent.trim();
+  toolTabs.style.display = "none";
+  hintEl.style.display = "none";
+  changeToolBtn.style.display = "inline-flex";
+}
+toolTabs.querySelectorAll(".t2-tab").forEach(tab => tab.addEventListener("click", () => selectTool(tab)));
+
+changeToolBtn.addEventListener("click", () => {
+  toolTabs.style.display = "flex";
+  hintEl.style.display = "block";
+  changeToolBtn.style.display = "none";
+  pageTitleText.textContent = "Tracing 2.0";
+});
+
+// Deep-link support (e.g. the "Indane Gas Info" sidebar shortcut,
+// includes/header.php, linking here with ?tool=indane-gas-info) - falls
+// back to the default first-visible tab if the slug is missing, not a
+// real tool, or not one this agent has access to (not rendered as a tab
+// at all in that case, per-tool checklist, Admin > Agents).
+const deepLinkTool = new URLSearchParams(location.search).get("tool");
+if (deepLinkTool) {
+  const deepLinkTab = toolTabs.querySelector(`.t2-tab[data-tool="${CSS.escape(deepLinkTool)}"]`);
+  if (deepLinkTab) selectTool(deepLinkTab);
+}
 
 // There's no per-step progress to report here (unlike LPG's job-based
 // polling) - this is one blocking fetch for the whole login+search+scrape
