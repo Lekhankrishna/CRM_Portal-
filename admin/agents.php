@@ -502,30 +502,18 @@ require __DIR__ . '/../includes/header.php';
       <label class="acf-feature">
         <input type="checkbox" name="tata_play_access" value="1">
         <span>TATA SKY DTH</span>
-        <span class="acf-limit" title="How many Tata Play searches this agent can run per calendar month - each one logs into the distributor's own mysso.tataplay.com account. Ignored for admins.">
-          <input type="number" name="tata_play_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-        </span>
       </label>
       <label class="acf-feature">
         <input type="checkbox" name="eagle_eye_access" value="1">
         <span>Advance Pan India</span>
-        <span class="acf-limit" title="How many Advance Pan India searches this agent can run per calendar month - shares a single monthly plan pool on theeagleeye.biz. Ignored for admins.">
-          <input type="number" name="eagle_eye_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-        </span>
       </label>
       <label class="acf-feature">
         <input type="checkbox" name="pan_india_pro_access" value="1">
         <span>Night Out</span>
-        <span class="acf-limit" title="How many Night Out searches this agent can run per calendar month - shares a single daily quota on the vendor's side. Ignored for admins.">
-          <input type="number" name="pan_india_pro_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-        </span>
       </label>
       <label class="acf-feature">
         <input type="checkbox" name="advanced_search_access" value="1">
         <span>Advanced Search</span>
-        <span class="acf-limit" title="How many Advanced Search searches this agent can run per calendar month - shares a single account's own daily/IP quota on tracekart.in. Ignored for admins.">
-          <input type="number" name="advanced_search_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-        </span>
       </label>
     </div>
 
@@ -677,33 +665,21 @@ require __DIR__ . '/../includes/header.php';
             <span class="badge <?= $u['tata_play_access'] ? 'badge-success' : 'badge-neutral' ?>">
               <?= $u['tata_play_access'] ? 'Granted' : 'Not Granted' ?>
             </span>
-            <?php if ($u['tata_play_access'] && $u['role'] !== 'admin'): ?>
-              <div class="text-sm text-muted" style="margin-top:2px"><?= (int) $u['tata_play_monthly_limit'] ?>/month</div>
-            <?php endif; ?>
           </td>
           <td>
             <span class="badge <?= $u['eagle_eye_access'] ? 'badge-success' : 'badge-neutral' ?>">
               <?= $u['eagle_eye_access'] ? 'Granted' : 'Not Granted' ?>
             </span>
-            <?php if ($u['eagle_eye_access'] && $u['role'] !== 'admin'): ?>
-              <div class="text-sm text-muted" style="margin-top:2px"><?= (int) $u['eagle_eye_monthly_limit'] ?>/month</div>
-            <?php endif; ?>
           </td>
           <td>
             <span class="badge <?= $u['pan_india_pro_access'] ? 'badge-success' : 'badge-neutral' ?>">
               <?= $u['pan_india_pro_access'] ? 'Granted' : 'Not Granted' ?>
             </span>
-            <?php if ($u['pan_india_pro_access'] && $u['role'] !== 'admin'): ?>
-              <div class="text-sm text-muted" style="margin-top:2px"><?= (int) $u['pan_india_pro_monthly_limit'] ?>/month</div>
-            <?php endif; ?>
           </td>
           <td>
             <span class="badge <?= $u['advanced_search_access'] ? 'badge-success' : 'badge-neutral' ?>">
               <?= $u['advanced_search_access'] ? 'Granted' : 'Not Granted' ?>
             </span>
-            <?php if ($u['advanced_search_access'] && $u['role'] !== 'admin'): ?>
-              <div class="text-sm text-muted" style="margin-top:2px"><?= (int) $u['advanced_search_monthly_limit'] ?>/month</div>
-            <?php endif; ?>
           </td>
           <td>
             <form method="post" class="expiry-form">
@@ -833,30 +809,18 @@ require __DIR__ . '/../includes/header.php';
           <label class="acf-feature">
             <input type="checkbox" name="tata_play_access" id="edit-tata_play_access" value="1">
             <span>TATA SKY DTH</span>
-            <span class="acf-limit" title="How many Tata Play searches this agent can run per calendar month - each one logs into the distributor's own mysso.tataplay.com account. Ignored for admins.">
-              <input type="number" name="tata_play_monthly_limit" id="edit-tata_play_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-            </span>
           </label>
           <label class="acf-feature">
             <input type="checkbox" name="eagle_eye_access" id="edit-eagle_eye_access" value="1">
             <span>Advance Pan India</span>
-            <span class="acf-limit" title="How many Advance Pan India searches this agent can run per calendar month - shares a single monthly plan pool on theeagleeye.biz. Ignored for admins.">
-              <input type="number" name="eagle_eye_monthly_limit" id="edit-eagle_eye_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-            </span>
           </label>
           <label class="acf-feature">
             <input type="checkbox" name="pan_india_pro_access" id="edit-pan_india_pro_access" value="1">
             <span>Night Out</span>
-            <span class="acf-limit" title="How many Night Out searches this agent can run per calendar month - shares a single daily quota on the vendor's side. Ignored for admins.">
-              <input type="number" name="pan_india_pro_monthly_limit" id="edit-pan_india_pro_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-            </span>
           </label>
           <label class="acf-feature">
             <input type="checkbox" name="advanced_search_access" id="edit-advanced_search_access" value="1">
             <span>Advanced Search</span>
-            <span class="acf-limit" title="How many Advanced Search searches this agent can run per calendar month - shares a single account's own daily/IP quota on tracekart.in. Ignored for admins.">
-              <input type="number" name="advanced_search_monthly_limit" id="edit-advanced_search_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-            </span>
           </label>
         </div>
         <div class="acf-tracing2-tools" id="edit-tracing2-tools-panel">
@@ -949,14 +913,10 @@ function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, tracin
   document.getElementById('edit-indane_gas_access').checked = !!indaneGasAccess;
   document.getElementById('edit-indane_gas_monthly_limit').value = indaneGasMonthlyLimit;
   document.getElementById('edit-tata_play_access').checked = !!tataPlayAccess;
-  document.getElementById('edit-tata_play_monthly_limit').value = tataPlayMonthlyLimit;
   document.getElementById('edit-eagle_eye_access').checked = !!eagleEyeAccess;
-  document.getElementById('edit-eagle_eye_monthly_limit').value = eagleEyeMonthlyLimit;
   document.getElementById('edit-pan_india_access').checked = !!panIndiaAccess;
   document.getElementById('edit-pan_india_pro_access').checked = !!panIndiaProAccess;
-  document.getElementById('edit-pan_india_pro_monthly_limit').value = panIndiaProMonthlyLimit;
   document.getElementById('edit-advanced_search_access').checked = !!advancedSearchAccess;
-  document.getElementById('edit-advanced_search_monthly_limit').value = advancedSearchMonthlyLimit;
   document.getElementById('edit-max_concurrent_sessions').value = maxSessions;
   document.getElementById('edit-expires_date').value = expiresDate;
   document.getElementById('edit-expires_time').value = expiresTime;
@@ -1090,10 +1050,10 @@ const AGENTS_EXPORT_DATA = <?= json_encode(array_map(function ($u) {
         'rc_print' => $u['rc_print_access'] ? "Granted ({$u['rc_print_monthly_limit']}/mo)" : 'Not Granted',
         'hp_gas' => $u['hp_gas_access'] ? "Granted ({$u['hp_gas_monthly_limit']}/mo)" : 'Not Granted',
         'indane_gas' => $u['indane_gas_access'] ? "Granted ({$u['indane_gas_monthly_limit']}/mo)" : 'Not Granted',
-        'tata_play' => $u['tata_play_access'] ? "Granted ({$u['tata_play_monthly_limit']}/mo)" : 'Not Granted',
-        'adv_pan_india' => $u['eagle_eye_access'] ? "Granted ({$u['eagle_eye_monthly_limit']}/mo)" : 'Not Granted',
-        'pan_india_pro' => $u['pan_india_pro_access'] ? "Granted ({$u['pan_india_pro_monthly_limit']}/mo)" : 'Not Granted',
-        'advanced_search' => $u['advanced_search_access'] ? "Granted ({$u['advanced_search_monthly_limit']}/mo)" : 'Not Granted',
+        'tata_play' => $u['tata_play_access'] ? 'Granted' : 'Not Granted',
+        'adv_pan_india' => $u['eagle_eye_access'] ? 'Granted' : 'Not Granted',
+        'pan_india_pro' => $u['pan_india_pro_access'] ? 'Granted' : 'Not Granted',
+        'advanced_search' => $u['advanced_search_access'] ? 'Granted' : 'Not Granted',
         'max_logins' => $u['max_concurrent_sessions'],
         'expires_at' => $u['expires_at'] ? date('d/m/Y H:i', strtotime($u['expires_at'])) : 'No expiry',
         'created_at' => $u['created_at'] ? date('d/m/Y H:i', strtotime($u['created_at'])) : '',

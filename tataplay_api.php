@@ -28,32 +28,6 @@ if (strlen($mobileNumber) !== 10) {
     exit;
 }
 
-// Same monthly-cap pattern as hp_gas_api.php/rc_print_api.php - this is a
-// real login against the distributor's own Tata Play account, so every
-// agent is capped per calendar month (Admin > Agents > "Tata Play Monthly
-// Limit"). Admins bypass this entirely.
-if (($_SESSION['role'] ?? '') !== 'admin') {
-    $stmt = $pdo->prepare('SELECT tata_play_monthly_limit FROM users WHERE id = :id');
-    $stmt->execute(['id' => $_SESSION['user_id']]);
-    $limit = (int) $stmt->fetchColumn();
-
-    $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'tata_play' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
-    );
-    $stmt->execute(['id' => $_SESSION['user_id']]);
-    $usedThisMonth = (int) $stmt->fetchColumn();
-
-    if ($usedThisMonth >= $limit) {
-        http_response_code(429);
-        echo json_encode([
-            'error' => "Monthly Tata Play limit reached ($usedThisMonth/$limit this month). Contact your admin to increase it, or try again next month.",
-            'used' => $usedThisMonth,
-            'limit' => $limit,
-        ]);
-        exit;
-    }
-}
-
 $ch = curl_init(FLASK_BASE . '/api/tataplay');
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 // Generous timeout - a fresh mysso.tataplay.com login plus the Siebel PRM
@@ -73,10 +47,10 @@ if ($response === false) {
     exit;
 }
 
-// Only a genuinely completed lookup counts against the monthly limit and
-// shows up in Admin > Audit Log - a failed login, timeout, or unreachable
-// service isn't the agent's fault. "found": false still counts as a
-// completed search, same reasoning as hp_gas_api.php.
+// A genuinely completed lookup still gets logged for Admin > Audit Log
+// (no monthly limit to enforce anymore) - a failed login, timeout, or
+// unreachable service isn't the agent's fault. "found": false still
+// counts as a completed search, same reasoning as hp_gas_api.php.
 $decoded = json_decode($response, true);
 if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decoded)) {
     try {
@@ -91,20 +65,6 @@ if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decode
             'cnt' => count($accounts),
             'ip' => substr($ip, 0, 45),
         ]);
-
-        if (($_SESSION['role'] ?? '') !== 'admin') {
-            $stmt = $pdo->prepare('SELECT tata_play_monthly_limit FROM users WHERE id = :id');
-            $stmt->execute(['id' => $_SESSION['user_id']]);
-            $decoded['limit'] = (int) $stmt->fetchColumn();
-
-            $stmt = $pdo->prepare(
-                "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'tata_play' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
-            );
-            $stmt->execute(['id' => $_SESSION['user_id']]);
-            $decoded['used'] = (int) $stmt->fetchColumn();
-
-            $response = json_encode($decoded);
-        }
     } catch (PDOException $e) {}
 
     // A search can genuinely match more than one account (see

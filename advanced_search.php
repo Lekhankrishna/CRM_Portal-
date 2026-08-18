@@ -3,23 +3,6 @@ require __DIR__ . '/includes/auth.php';
 requireAdvancedSearchAccess();
 require_once __DIR__ . '/config/db.php';
 
-// Same quota-badge pattern as rc_print.php/hp_gas.php/advance_pan_india.php.
-$isAdmin = ($_SESSION['role'] ?? '') === 'admin';
-$quota = null;
-if (!$isAdmin) {
-    $stmt = $pdo->prepare('SELECT advanced_search_monthly_limit FROM users WHERE id = :id');
-    $stmt->execute(['id' => $_SESSION['user_id']]);
-    $monthlyLimit = (int) $stmt->fetchColumn();
-
-    $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'advanced_search' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
-    );
-    $stmt->execute(['id' => $_SESSION['user_id']]);
-    $usedThisMonth = (int) $stmt->fetchColumn();
-
-    $quota = ['used' => $usedThisMonth, 'limit' => $monthlyLimit];
-}
-
 $basePath = '';
 require __DIR__ . '/includes/header.php';
 ?>
@@ -30,14 +13,6 @@ require __DIR__ . '/includes/header.php';
 
 <div class="page-header" style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
   <h1 class="page-title" style="margin:0"><i class="bi bi-search"></i> Advanced Search</h1>
-  <?php if ($isAdmin): ?>
-    <span id="asQuotaBadge" class="badge badge-neutral" style="margin-left:auto">Unlimited (Admin)</span>
-  <?php elseif ($quota !== null): ?>
-    <span id="asQuotaBadge" class="badge <?= $quota['used'] >= $quota['limit'] ? 'badge-danger' : 'badge-neutral' ?>"
-          style="margin-left:auto">
-      <?= $quota['limit'] - $quota['used'] > 0 ? $quota['limit'] - $quota['used'] : 0 ?> of <?= $quota['limit'] ?> left this month
-    </span>
-  <?php endif; ?>
 </div>
 
 <style>
@@ -180,7 +155,6 @@ const resultToolbar = document.getElementById("asResultToolbar");
 const resultHeadRow = document.getElementById("asResultHeadRow");
 const resultBody = document.getElementById("asResultBody");
 const noResultsEl = document.getElementById("asNoResults");
-const quotaBadge = document.getElementById("asQuotaBadge");
 let lastHeaders = [];
 let lastRows = [];
 const progressWrap    = document.getElementById("asProgressWrap");
@@ -260,14 +234,6 @@ document.querySelectorAll(".as-tabs .as-tab").forEach(tab => tab.addEventListene
   statusEl.textContent = "";
 }));
 
-function updateQuotaBadge(used, limit) {
-  if (!quotaBadge) return;
-  const remaining = Math.max(0, limit - used);
-  quotaBadge.textContent = `${remaining} of ${limit} left this month`;
-  quotaBadge.classList.toggle("badge-danger", used >= limit);
-  quotaBadge.classList.toggle("badge-neutral", used < limit);
-}
-
 function collectFields() {
   switch (activeMode) {
     case "mobile": return { mobile: document.getElementById("asMobile").value.trim() };
@@ -323,9 +289,6 @@ function renderResult(data) {
   }
 
   if (lastRows.length) startConfetti(); else stopConfetti();
-  if (typeof data.used === "number" && typeof data.limit === "number") {
-    updateQuotaBadge(data.used, data.limit);
-  }
 }
 
 async function runSearch() {
@@ -352,9 +315,6 @@ async function runSearch() {
     if (!res.ok) {
       stopProgress(null);
       statusEl.textContent = `Error: ${data.error || "could not complete search"}`;
-      if (typeof data.used === "number" && typeof data.limit === "number") {
-        updateQuotaBadge(data.used, data.limit);
-      }
       return;
     }
 
