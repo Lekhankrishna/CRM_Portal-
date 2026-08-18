@@ -238,8 +238,12 @@ def _extract_account_details(driver, wait):
     # find_elements() call still tolerates a StaleElementReferenceException
     # (this page can also genuinely swap nodes out from under a read mid-
     # poll, same failure mode already handled in tracing2_tools.py's own
-    # polling loop) without aborting the whole pass.
-    deadline = time.time() + 15
+    # polling loop) without aborting the whole pass. Kept short (2026-08-19,
+    # per explicit "taking too much time" feedback, was 15s) - these fields
+    # are consistently readable within the first couple passes in every
+    # live test so far; a long ceiling here was only ever paying for a
+    # worst case that hasn't actually been observed.
+    deadline = time.time() + 6
     values, previous = {}, None
     while time.time() < deadline:
         current = {}
@@ -279,8 +283,14 @@ def _extract_account_details(driver, wait):
     # values land, so a match needs at least one non-empty value, not just
     # a header/row match, before it's trusted. Same stability-across-two-
     # passes reasoning as the aria fields above once it does have data.
+    # Kept short (2026-08-19, per explicit "taking too much time" feedback,
+    # was 15s) - this grid's timing is inherently unreliable (sometimes
+    # ready in seconds, sometimes not within 15s+ even), so a long ceiling
+    # here was mostly just paying search latency for very little extra hit
+    # rate; failing fast to "" is the better trade now that speed matters
+    # more than squeezing out an occasional extra hit on this one section.
     digicard, previous = {}, None
-    deadline = time.time() + 15
+    deadline = time.time() + 5
     while time.time() < deadline:
         try:
             candidate = _read_jqgrid_first_row(driver, ["Product", "Digicard #"])
@@ -450,15 +460,13 @@ def run_tataplay_single(mobile_number):
             }
             try:
                 _open_nth_result_detail(driver, wait, i)
-                # document.readyState only covers the initial page
-                # structure - the Digicard/Asset grid loads via its own
-                # later, separate async call, confirmed live 2026-08-19 to
-                # sometimes still be empty several seconds after readyState
-                # already reports "complete". A flat head-start here (same
-                # "let client-side rendering catch up" reasoning as every
-                # other post-navigation sleep in this file) before polling
-                # starts, rather than relying on the poll alone to outlast it.
-                time.sleep(3)
+                # A flat pre-poll settle sleep was tried here (2026-08-19)
+                # to give the Digicard grid's async load a head start -
+                # removed after confirming live it didn't meaningfully
+                # improve the hit rate, so it was just adding latency for
+                # no real benefit (per explicit "taking too much time"
+                # feedback). _extract_account_details() still polls for
+                # each field on its own.
                 account.update(_extract_account_details(driver, wait))
             except Exception:
                 pass  # best-effort - keep whatever list-level fields we already have
