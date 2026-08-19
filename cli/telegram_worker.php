@@ -88,6 +88,22 @@ $settings->setAppInfo(
         ->setApiHash((string) $TELEGRAM_API_HASH)
 );
 
+// Tried switching the protocol away from the library's default
+// (AbridgedStream, plain unobfuscated MTProto over raw TCP) on 2026-08-19
+// after 6 consecutive login timeouts on users.getUsers, on the theory that
+// the raw protocol's recognizable framing was being interfered with
+// somewhere on this network (a regular Telegram web session from the same
+// network reached the bot fine in the meantime, proving the account/bot
+// itself was healthy). ObfuscatedStream turned out not to be a valid
+// setProtocol() target (it's a proxy wrapper, not a standalone
+// MTProtoBufferInterface protocol) and HttpsStream got further but then
+// hit a null-reference crash inside the library's own DC-5 handshake code
+// ("Call to a member function getInputClientProxy() on null") - a
+// different, less-understood failure than the original clean timeout, not
+// an improvement. Reverted back to the library default rather than keep
+// guessing at connection settings on a production integration without
+// clearer visibility into why either failure mode is happening.
+
 try {
     $api = new \danog\MadelineProto\API($serviceDirectory . '/worker.session', $settings);
     echo PHP_EOL . "ONE-TIME TELEGRAM QR LOGIN" . PHP_EOL;
