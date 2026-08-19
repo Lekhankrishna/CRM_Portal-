@@ -103,6 +103,28 @@ $settings->setAppInfo(
 // an improvement. Reverted back to the library default rather than keep
 // guessing at connection settings on a production integration without
 // clearer visibility into why either failure mode is happening.
+//
+// The library's own default raw connection timeout is just 5 seconds -
+// suspiciously tight given MadelineProto's own startup warning that it
+// runs "around 10x slower on Windows", and every failure so far had been
+// a clean timeout (never an auth error, never a rejection). Bumped to 30s
+// (2026-08-19) on that theory - didn't fix the login timeout (still failed
+// identically, same "operation was cancelled" at roughly the same elapsed
+// time regardless of this setting), but kept anyway since it's strictly
+// safer than the library default and doesn't carry the risk the two
+// protocol-switch attempts above did. The failure being this consistent
+// in both symptom AND timing across three different settings changes (two
+// protocols, one timeout) now looks more like something actively cutting
+// the connection from outside this machine (a firewall/ISP resetting a
+// long-lived MTProto-looking connection after roughly the same duration
+// each time) than anything fixable from PHP settings - would need network-
+// level investigation (Windows Firewall logs, router config, or testing
+// from a different network) to confirm, which is outside what's been
+// tried here.
+$settings->setConnection(
+    (new \danog\MadelineProto\Settings\Connection)
+        ->setTimeout(30)
+);
 
 try {
     $api = new \danog\MadelineProto\API($serviceDirectory . '/worker.session', $settings);
