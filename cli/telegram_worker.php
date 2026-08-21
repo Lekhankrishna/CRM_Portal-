@@ -30,7 +30,20 @@ function telegramRetryAfterCancellation(callable $operation, int $attempts = 12)
         try {
             return $operation();
         } catch (Throwable $error) {
+            // Amp\TimeoutException added 2026-08-21: API::__construct()'s own
+            // internal wakeup() does an automatic getSelf() with no retry
+            // protection of its own, and that call's outer exception is a
+            // plain Amp\TimeoutException ("Timeout while waiting for
+            // users.getUsers") - not a CancelledException, and its own
+            // ->getMessage() doesn't contain "operation was cancelled" (that
+            // text is on the chained/previous exception, which ->getMessage()
+            // doesn't see). Confirmed live: this crashed the whole worker
+            // twice in a row at the exact same construction step, right
+            // after a real, successful DC5/DC2 key exchange - a transient
+            // hiccup, not a hard failure, so it belongs in the same
+            // retryable bucket as an explicit cancellation.
             $cancelled = $error instanceof \Amp\CancelledException
+                || $error instanceof \Amp\TimeoutException
                 || stripos($error->getMessage(), 'operation was cancelled') !== false;
             if (!$cancelled || $attempt === $attempts) throw $error;
             echo "Telegram is completing the login hand-off; retrying..." . PHP_EOL;
@@ -88,46 +101,71 @@ $settings->setAppInfo(
         ->setApiHash((string) $TELEGRAM_API_HASH)
 );
 
-// Tried switching the protocol away from the library's default
-// (AbridgedStream, plain unobfuscated MTProto over raw TCP) on 2026-08-19
-// after 6 consecutive login timeouts on users.getUsers, on the theory that
-// the raw protocol's recognizable framing was being interfered with
-// somewhere on this network (a regular Telegram web session from the same
-// network reached the bot fine in the meantime, proving the account/bot
-// itself was healthy). ObfuscatedStream turned out not to be a valid
-// setProtocol() target (it's a proxy wrapper, not a standalone
-// MTProtoBufferInterface protocol) and HttpsStream got further but then
-// hit a null-reference crash inside the library's own DC-5 handshake code
-// ("Call to a member function getInputClientProxy() on null") - a
-// different, less-understood failure than the original clean timeout, not
-// an improvement. Reverted back to the library default rather than keep
-// guessing at connection settings on a production integration without
-// clearer visibility into why either failure mode is happening.
+// ROOT CAUSE FOUND AND FIXED (2026-08-19), after the settings-tweaking
+// attempts below (protocol switches, timeout bump) all failed to help - it
+// was never a network/firewall issue. It was a real MadelineProto 8.6.5
+// library bug (confirmed still present in current upstream master and in
+// 8.7.0 too, so not something a version bump would have fixed):
+// Connection::getInputClientProxy() (Connection.php:240) dereferences its
+// $chosenCtx property without a null check. $chosenCtx is only assigned
+// inside connect(), once a TCP stream is actually established - but
+// DataCenterConnection::initAuthorization()'s ENCRYPTED_NOT_INITED branch
+// calls getInputClientProxy() eagerly, as part of building the
+// invokeWithLayer/initConnection arguments, BEFORE the methodCallAsyncRead()
+// call that would itself trigger connect(). Because this worker's session
+// already has a persisted permanent auth key, every fresh process reaches
+// ENCRYPTED_NOT_INITED as the very first state transition - so this crashed
+// on literally every login attempt. The library's own ctx-fallback then
+// silently opened a second connection (which succeeded at the raw TCP
+// level) but never re-queued the actual handshake message on it, so it just
+// sat idle until the ~30-65s timeout we kept seeing. Verified with
+// protocol-level verbose logging (Settings\Logger at ULTRA_VERBOSE) against
+// a throwaway copy of the phar.
 //
-// The library's own default raw connection timeout is just 5 seconds -
-// suspiciously tight given MadelineProto's own startup warning that it
-// runs "around 10x slower on Windows", and every failure so far had been
-// a clean timeout (never an auth error, never a rejection). Bumped to 30s
-// (2026-08-19) on that theory - didn't fix the login timeout (still failed
-// identically, same "operation was cancelled" at roughly the same elapsed
-// time regardless of this setting), but kept anyway since it's strictly
-// safer than the library default and doesn't carry the risk the two
-// protocol-switch attempts above did. The failure being this consistent
-// in both symptom AND timing across three different settings changes (two
-// protocols, one timeout) now looks more like something actively cutting
-// the connection from outside this machine (a firewall/ISP resetting a
-// long-lived MTProto-looking connection after roughly the same duration
-// each time) than anything fixable from PHP settings - would need network-
-// level investigation (Windows Firewall logs, router config, or testing
-// from a different network) to confirm, which is outside what's been
-// tried here.
+// Fixed with a one-line vendor patch to the bundled
+// madeline-8.6.5.phar (original backed up alongside it as
+// madeline-8.6.5.phar.bak-preNullSafePatch): changed
+// `return $this->chosenCtx->getInputClientProxy();` to
+// `return $this->chosenCtx?->getInputClientProxy();` in
+// vendor/danog/madelineproto/src/Connection.php - safe because the method's
+// own return type was already declared nullable (?array), so "no chosen
+// context yet" correctly reporting "no proxy" rather than crashing is
+// exactly the intended contract, not a behavior change for the normal case.
+//
+// Fixing this crash immediately exposed a SECOND, previously-masked issue:
+// Telegram's servers were rejecting this exact session's auth key with
+// AUTH_KEY_DUPLICATED - a real server-side security rejection (almost
+// certainly triggered by the 211-stuck-process incident from the same day,
+// where many worker processes concurrently reused the same saved key,
+// which is exactly what this Telegram protection exists to catch), not
+// fixable from client-side settings. The old worker.session was backed up
+// (worker.session.bak-authKeyDuplicated-<timestamp>) and a fresh QR login
+// was required to get a new, valid key.
+// Post-login (2026-08-21): even after fixing the crash and re-authenticating,
+// getFullDialogs() kept failing on a fresh danog\MadelineProto\
+// NothingInTheSocketException on every single retry (8 in a row) - the raw,
+// unencrypted AbridgedStream connection to DC 2 kept getting cut mid-read.
+// This is the same failure mode HttpsStream ran into before, except that
+// attempt was blocked by the getInputClientProxy() crash (now fixed) before
+// it could actually be evaluated on its own merits - a real TLS-wrapped
+// transport (indistinguishable from ordinary HTTPS to anything on this
+// network inspecting the raw framing) is the natural next thing to try now
+// that it's actually testable.
 $settings->setConnection(
     (new \danog\MadelineProto\Settings\Connection)
         ->setTimeout(30)
+        ->setProtocol(\danog\MadelineProto\Stream\MTProtoTransport\HttpsStream::class)
 );
 
 try {
-    $api = new \danog\MadelineProto\API($serviceDirectory . '/worker.session', $settings);
+    // Wrapped in the same retry helper as every other call below (2026-08-21)
+    // - construction itself was the one place a transient timeout during
+    // MadelineProto's own internal post-login wakeup() check had zero retry
+    // protection, and that's exactly what crashed the worker twice in a row.
+    $api = telegramRetryAfterCancellation(
+        fn() => new \danog\MadelineProto\API($serviceDirectory . '/worker.session', $settings),
+        5
+    );
     echo PHP_EOL . "ONE-TIME TELEGRAM QR LOGIN" . PHP_EOL;
     echo "On the logged-in phone: Telegram > Settings > Devices > Link Desktop Device." . PHP_EOL;
     echo "Scan the terminal QR code below. It refreshes automatically when expired." . PHP_EOL . PHP_EOL;
@@ -145,6 +183,17 @@ try {
             $qr = $qr->waitForLoginOrQrCodeExpiration();
         } catch (\Amp\CancelledException $e) {
             echo "QR expired or Telegram changed data centre; generating a fresh code..." . PHP_EOL;
+            $qr = $api->qrLogin();
+        } catch (\danog\MadelineProto\RPCErrorException $e) {
+            // AUTH_TOKEN_EXPIRED added 2026-08-21: confirmed live - a real
+            // scan can still lose the race against the token's own ~30s
+            // lifetime (network/UI delay on the phone side), which Telegram
+            // reports as this RPC error, not the Amp\CancelledException the
+            // catch above already handles. Previously uncaught, crashing the
+            // whole worker instead of just retrying with a fresh code like
+            // any other expiration.
+            if (stripos($e->getMessage(), 'AUTH_TOKEN_EXPIRED') === false) throw $e;
+            echo "Login token expired before the scan was confirmed; generating a fresh code..." . PHP_EOL;
             $qr = $api->qrLogin();
         }
     } while ($qr !== null);
