@@ -2,7 +2,14 @@
 
 const TELEGRAM_WORKER_ADDRESS = 'tcp://127.0.0.1:8091';
 
-function telegramWorkerRequest(array $request, int $timeout = 30): array
+// 75s default - the search action's own worst-case budget is now bounded
+// (see cli/telegram_worker.php's telegramCallWithTimeout()): up to 10s for
+// the pre-search history check, 25s for sending the query (confirmed live
+// this can genuinely take over 10s on this network), then a 20s polling
+// window whose own per-call cap is 8s - roughly 63s worst case, so a
+// client-side wait much shorter than that could time out on a search
+// that's still genuinely in progress rather than actually stuck.
+function telegramWorkerRequest(array $request, int $timeout = 75): array
 {
     $errorNumber = 0;
     $errorMessage = '';

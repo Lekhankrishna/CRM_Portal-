@@ -32,7 +32,7 @@ if (!hasPanIndiaAccess()) {
 
 require_once __DIR__ . '/../includes/telegram_worker_client.php';
 require_once __DIR__ . '/../includes/pan_india_archive.php';
-set_time_limit(60);
+set_time_limit(90);
 
 // No ": never" return type - that's PHP 8.1+ only, and this file needs to
 // parse on PHP 7.4 (found 2026-08-06: the production IIS site serves PHP
@@ -71,7 +71,7 @@ try {
     if ($type === 'contact') {
         $query = normalizeContactQuery($query);
     }
-    $response = telegramWorkerRequest(['action' => 'search', 'query' => $query], 30);
+    $response = telegramWorkerRequest(['action' => 'search', 'query' => $query], 75);
     if (empty($response['ok'])) {
         // Never forward the worker's own error text to the client - it can
         // name the underlying provider or its exact failure mode. Agents

@@ -53,6 +53,25 @@ function telegramRetryAfterCancellation(callable $operation, int $attempts = 12)
     throw new RuntimeException('Telegram login hand-off did not complete.');
 }
 
+// Bounds a single MadelineProto call so it can never freeze the whole worker.
+// Confirmed live 2026-08-22: $api->messages->getHistory()/sendMessage() in
+// the search handler below have no timeout of their own - when one hangs
+// (seen with no exception, no log output, nothing - a true deadlock, not a
+// slow response), stream_socket_accept()'s outer while loop never returns to
+// accept a new connection either, so EVERY subsequent request queues up
+// behind the frozen one until the whole process is killed and restarted.
+// Amp\TimeoutCancellation is the same event loop this file's MadelineProto
+// calls already run on (Revolt), so it can actually interrupt a stuck call
+// instead of just racing it from a separate thread.
+function telegramCallWithTimeout(callable $operation, float $seconds, string $label): mixed
+{
+    try {
+        return \Amp\async($operation)->await(new \Amp\TimeoutCancellation($seconds));
+    } catch (\Amp\CancelledException $error) {
+        throw new RuntimeException("Timed out waiting for $label (>{$seconds}s).", 0, $error);
+    }
+}
+
 function cleanTelegramResult(string $text): string
 {
     $lines = preg_split('/\R/u', $text) ?: [];
@@ -252,9 +271,22 @@ try {
                 $query = trim((string) ($request['query'] ?? ''));
                 if ($query === '') throw new RuntimeException('Search query is required.');
 
-                $history = $api->messages->getHistory(peer: $peer, limit: 1);
+                $history = telegramCallWithTimeout(
+                    fn() => $api->messages->getHistory(peer: $peer, limit: 1),
+                    10, 'the pre-search history check'
+                );
                 $beforeId = (int) ($history['messages'][0]['id'] ?? 0);
-                $api->messages->sendMessage(peer: $peer, message: $query);
+                // 25s (not 10s) - confirmed live 2026-08-22: a 10s cap
+                // genuinely fired on a call that went on to succeed at
+                // 26s total once given more room. MadelineProto's own
+                // startup warning ("runs around 10x slower on Windows") is
+                // consistent with this being real, if unusually slow,
+                // network latency rather than a stuck call - still bounded,
+                // just no longer tight enough to reject a normal response.
+                telegramCallWithTimeout(
+                    fn() => $api->messages->sendMessage(peer: $peer, message: $query),
+                    25, 'sending the search query'
+                );
 
                 $pattern = '/telephone\s*:|email\s*:|aadhaar(?:\s+number)?\s*:|(?:address|adres)\s*:|full\s*name\s*:|name\s+of\s+the\s+father\s*:/i';
                 $deadline = microtime(true) + 20;
@@ -274,7 +306,18 @@ try {
                 // more than one poll cycle (so a second confirmation poll
                 // always happens), just shaves ~0.5s off every search.
                 do {
-                    $history = $api->messages->getHistory(peer: $peer, min_id: $beforeId, limit: 30);
+                    // A single stuck poll no longer eats the whole request -
+                    // caught and treated as "nothing new this cycle" so the
+                    // outer $deadline (not this call) decides when to give up.
+                    try {
+                        $history = telegramCallWithTimeout(
+                            fn() => $api->messages->getHistory(peer: $peer, min_id: $beforeId, limit: 30),
+                            8, 'a search-results poll'
+                        );
+                    } catch (RuntimeException $error) {
+                        usleep(800000);
+                        continue;
+                    }
                     foreach ($history['messages'] ?? [] as $message) {
                         $id = (int) ($message['id'] ?? 0);
                         $text = trim((string) ($message['message'] ?? ''));
