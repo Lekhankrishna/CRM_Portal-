@@ -141,7 +141,7 @@ code{
   text-decoration:none;font-weight:800;font-size:15px;letter-spacing:-.2px;
 }
 .sidebar__brand-icon{
-  width:30px;height:30px;flex-shrink:0;object-fit:contain;
+  width:44px;height:44px;flex-shrink:0;object-fit:contain;
 }
 .sidebar__hamburger{
   background:none;border:none;color:var(--c-text-muted);font-size:18px;
@@ -926,7 +926,7 @@ body.login-page::before{
 }
 .login-logo{text-align:center;margin-bottom:32px;}
 .login-logo__icon{
-  width:64px;height:64px;object-fit:contain;
+  width:100px;height:100px;object-fit:contain;
   display:inline-block;margin-bottom:14px;
 }
 .login-logo__title{font-size:24px;font-weight:800;color:var(--c-text);margin:0 0 5px;letter-spacing:-.3px;}

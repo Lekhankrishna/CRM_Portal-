@@ -68,6 +68,13 @@ if (hasPanIndiaProAccess()) {
 if (hasHpGasAccess()) {
     $searchRegionsExtra[] = ['label' => 'HP LPG Search', 'href' => 'hp_gas.php'];
 }
+// Tata Sky DTH is opt-in per account (Admin > Agents > "Tata Sky DTH Access") - own
+// tata_dth.py automation against a Tata Play distributor's Siebel PRM
+// portal login, proxied through tata_dth_api.php, same pattern as RC Print/
+// HP Gas above.
+if (hasTataDthAccess()) {
+    $searchRegionsExtra[] = ['label' => 'Tata Sky DTH Search', 'href' => 'tata_dth.php'];
+}
 // LPG Search is opt-in per account (Admin > Agents > "LPG Search Access") —
 // only add the menu item at all when the current user has been granted it.
 // The pages/APIs enforce the same check server-side (403) regardless, so
@@ -125,7 +132,7 @@ $expiresLabel = $expiresAt ? date('d-F-Y', strtotime($expiresAt)) : null;
   <aside class="sidebar" id="sidebar">
     <div class="sidebar__top">
       <a class="sidebar__brand" href="<?= $bp ?>index.php">
-        <img class="sidebar__brand-icon" src="<?= $bp ?>assets/logo.png" alt="Speed Search">
+        <img class="sidebar__brand-icon" src="<?= $bp ?>assets/logo.jpg" alt="Speed Search">
         Speed Search
       </a>
       <button class="sidebar__hamburger" id="sidebar-toggle" type="button" aria-label="Toggle menu">
