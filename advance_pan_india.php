@@ -90,7 +90,6 @@ const clearBtn   = document.getElementById("eeClearBtn");
 const exportBtn  = document.getElementById("eeExportBtn");
 const statusEl   = document.getElementById("eeStatus");
 const resultWrap = document.getElementById("eeResultWrap");
-const quotaBadge = document.getElementById("eeQuotaBadge");
 let lastEeTables = [];
 const progressWrap    = document.getElementById("eeProgressWrap");
 const progressLabel   = document.getElementById("eeProgressLabel");
@@ -149,14 +148,6 @@ const fields = {
   master_id: document.getElementById("eeMasterId"),
 };
 
-function updateQuotaBadge(used, limit) {
-  if (!quotaBadge) return;
-  const remaining = Math.max(0, limit - used);
-  quotaBadge.textContent = `${remaining} of ${limit} left this month`;
-  quotaBadge.classList.toggle("badge-danger", used >= limit);
-  quotaBadge.classList.toggle("badge-neutral", used < limit);
-}
-
 // Tables come from theeagleeye.biz's own result tables, read generically
 // (whatever headers/columns it renders) - see includes/eagleeye_client.php.
 function renderResult(data) {
@@ -205,9 +196,6 @@ function renderResult(data) {
 
   resultWrap.style.display = "block";
   if (lastEeTables.length) startConfetti(); else stopConfetti();
-  if (typeof data.used === "number" && typeof data.limit === "number") {
-    updateQuotaBadge(data.used, data.limit);
-  }
 }
 
 async function runSearch() {
@@ -238,9 +226,6 @@ async function runSearch() {
     if (!res.ok) {
       stopProgress(null);
       statusEl.textContent = `Error: ${data.error || "could not complete search"}`;
-      if (typeof data.used === "number" && typeof data.limit === "number") {
-        updateQuotaBadge(data.used, data.limit);
-      }
       return;
     }
 

@@ -156,7 +156,6 @@ const resultToolbar = document.getElementById("asResultToolbar");
 const resultHeadRow = document.getElementById("asResultHeadRow");
 const resultBody = document.getElementById("asResultBody");
 const noResultsEl = document.getElementById("asNoResults");
-const quotaBadge = document.getElementById("asQuotaBadge");
 let lastHeaders = [];
 let lastRows = [];
 const progressWrap    = document.getElementById("asProgressWrap");
@@ -236,14 +235,6 @@ document.querySelectorAll(".as-tabs .as-tab").forEach(tab => tab.addEventListene
   statusEl.textContent = "";
 }));
 
-function updateQuotaBadge(used, limit) {
-  if (!quotaBadge) return;
-  const remaining = Math.max(0, limit - used);
-  quotaBadge.textContent = `${remaining} of ${limit} left this month`;
-  quotaBadge.classList.toggle("badge-danger", used >= limit);
-  quotaBadge.classList.toggle("badge-neutral", used < limit);
-}
-
 function collectFields() {
   switch (activeMode) {
     case "mobile": return { mobile: document.getElementById("asMobile").value.trim() };
@@ -299,9 +290,6 @@ function renderResult(data) {
   }
 
   if (lastRows.length) startConfetti(); else stopConfetti();
-  if (typeof data.used === "number" && typeof data.limit === "number") {
-    updateQuotaBadge(data.used, data.limit);
-  }
 }
 
 async function runSearch() {
@@ -328,9 +316,6 @@ async function runSearch() {
     if (!res.ok) {
       stopProgress(null);
       statusEl.textContent = `Error: ${data.error || "could not complete search"}`;
-      if (typeof data.used === "number" && typeof data.limit === "number") {
-        updateQuotaBadge(data.used, data.limit);
-      }
       return;
     }
 

@@ -137,7 +137,6 @@ const statusEl   = document.getElementById("pipStatus");
 const resultWrap = document.getElementById("pipResultWrap");
 const resultToolbar = document.getElementById("pipResultToolbar");
 const resultBody = document.getElementById("pipResultBody");
-const quotaBadge = document.getElementById("pipQuotaBadge");
 let lastPipRows = [];
 const progressWrap    = document.getElementById("pipProgressWrap");
 const progressLabel   = document.getElementById("pipProgressLabel");
@@ -194,14 +193,6 @@ const fields = {
   address: document.getElementById("pipAddress"),
   master_id: document.getElementById("pipMasterId"),
 };
-
-function updateQuotaBadge(used, limit) {
-  if (!quotaBadge) return;
-  const remaining = Math.max(0, limit - used);
-  quotaBadge.textContent = `${remaining} of ${limit} left this month`;
-  quotaBadge.classList.toggle("badge-danger", used >= limit);
-  quotaBadge.classList.toggle("badge-neutral", used < limit);
-}
 
 function cell(value) {
   return value ? String(value) : "—";
@@ -262,9 +253,6 @@ function renderResult(data) {
   }
 
   if (lastPipRows.length) startConfetti(); else stopConfetti();
-  if (typeof data.used === "number" && typeof data.limit === "number") {
-    updateQuotaBadge(data.used, data.limit);
-  }
 }
 
 async function runSearch() {
@@ -295,9 +283,6 @@ async function runSearch() {
     if (!res.ok) {
       stopProgress(null);
       statusEl.textContent = `Error: ${data.error || "could not complete search"}`;
-      if (typeof data.used === "number" && typeof data.limit === "number") {
-        updateQuotaBadge(data.used, data.limit);
-      }
       return;
     }
 

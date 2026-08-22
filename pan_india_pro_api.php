@@ -49,8 +49,8 @@ try {
     exit;
 }
 
-// A completed search (found or not) counts against the monthly limit and
-// shows up in Admin > Audit Log.
+// A completed search (found or not) still gets logged for Admin > Audit
+// Log (no monthly limit to enforce anymore).
 try {
     $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
     $queryText = implode(' ', array_filter($params, fn($v) => $v !== ''));
