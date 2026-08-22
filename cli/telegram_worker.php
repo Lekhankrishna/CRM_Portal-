@@ -72,6 +72,32 @@ function telegramCallWithTimeout(callable $operation, float $seconds, string $la
     }
 }
 
+// Retries with a FRESH call instead of just waiting longer on one attempt.
+// Confirmed live 2026-08-22, repeatedly: DC 5 (this peer's datacenter) is
+// not consistently slow by some fixed amount - it's unpredictable, and
+// raising a single attempt's timeout (10s -> 20s -> 40s, each time with
+// live confirmation the old cap was too tight) never converged, because
+// the worker's own log kept showing the SAME pattern at whatever the new,
+// higher cap was: "Got a response... but there is no request!" - i.e. the
+// call DOES eventually succeed, just unpredictably late, sometimes past
+// even a generous cap. A second independent attempt has empirically been
+// fast when tried standalone (this file's own history: several single-shot
+// runs completed in 26-51s on the first try), so two shorter, independent
+// tries costs the same worst-case ceiling as one long wait but doesn't
+// require the FIRST attempt specifically to be the one that succeeds.
+function telegramCallWithRetry(callable $operation, float $perAttemptSeconds, int $attempts, string $label): mixed
+{
+    $lastError = null;
+    for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+        try {
+            return telegramCallWithTimeout($operation, $perAttemptSeconds, $label);
+        } catch (RuntimeException $error) {
+            $lastError = $error;
+        }
+    }
+    throw $lastError;
+}
+
 function cleanTelegramResult(string $text): string
 {
     $lines = preg_split('/\R/u', $text) ?: [];
@@ -271,28 +297,48 @@ try {
                 $query = trim((string) ($request['query'] ?? ''));
                 if ($query === '') throw new RuntimeException('Search query is required.');
 
-                $history = telegramCallWithTimeout(
+                // Retried, not just given one long wait - confirmed live
+                // 2026-08-22 across four rounds of testing that raising a
+                // single attempt's cap (10s -> 20s -> 40s) never converged:
+                // whatever the cap was, the worker's own log kept showing
+                // the SAME "Got a response... but there is no request!"
+                // pattern - the call eventually succeeds, just
+                // unpredictably late, sometimes past even a generous cap.
+                // 25s x 2 independent tries costs the same worst-case
+                // ceiling as one 50s wait, but doesn't depend on the FIRST
+                // attempt specifically being the lucky one.
+                $history = telegramCallWithRetry(
                     fn() => $api->messages->getHistory(peer: $peer, limit: 1),
-                    10, 'the pre-search history check'
+                    25, 2, 'the pre-search history check'
                 );
                 $beforeId = (int) ($history['messages'][0]['id'] ?? 0);
-                // 25s (not 10s) - confirmed live 2026-08-22: a 10s cap
-                // genuinely fired on a call that went on to succeed at
-                // 26s total once given more room. MadelineProto's own
-                // startup warning ("runs around 10x slower on Windows") is
-                // consistent with this being real, if unusually slow,
-                // network latency rather than a stuck call - still bounded,
-                // just no longer tight enough to reject a normal response.
-                telegramCallWithTimeout(
+                telegramCallWithRetry(
                     fn() => $api->messages->sendMessage(peer: $peer, message: $query),
-                    25, 'sending the search query'
+                    25, 2, 'sending the search query'
                 );
 
+                // Concurrent-user correctness check: this account is shared
+                // by 5 other systems all messaging the SAME bot chat, so
+                // messages polled after $beforeId can include another
+                // system's own query/reply, not just this one's. Without
+                // this, the first field-shaped message to show up wins,
+                // which risks handing one agent a DIFFERENT person's search
+                // result. $queryDigits is compared against each candidate
+                // reply so only a message that actually contains the
+                // searched value gets accepted - a false match is skipped
+                // (not returned, not counted toward quietSince), and
+                // polling keeps going for the real one instead.
+                $queryNormalized = preg_replace('/[^a-z0-9]/i', '', $query);
                 $pattern = '/telephone\s*:|email\s*:|aadhaar(?:\s+number)?\s*:|(?:address|adres)\s*:|full\s*name\s*:|name\s+of\s+the\s+father\s*:/i';
-                $deadline = microtime(true) + 20;
+                // 40s (not 20s) - same DC-5-is-just-slow finding as the two
+                // calls above applies here too: at the old 20s budget and
+                // an 8s per-poll cap, a run where individual polls are
+                // running slow gets through only ~2 attempts before giving
+                // up, nowhere near enough chances to actually see the bot's
+                // reply.
+                $deadline = microtime(true) + 40;
                 $results = [];
                 $seen = [];
-                $quietSince = null;
                 // Polling messages.getHistory this often used to trip Telegram's
                 // own flood control - confirmed 2026-07-30 in
                 // telegram-worker-output.log ("Flood, waiting 11 seconds before
@@ -300,19 +346,19 @@ try {
                 // far more time than it saved. 800ms is the fastest cadence
                 // observed to stay clear of that penalty, so it's untouched -
                 // do NOT lower it without re-testing against the live bot.
-                // The quiet-confirmation window (2026-08-17, "too slow") is a
-                // pure local wait *after* the bot has already replied, so it's
-                // safe to trim independently: 1.5s -> 1.0s, still comfortably
-                // more than one poll cycle (so a second confirmation poll
-                // always happens), just shaves ~0.5s off every search.
+                //
+                // 2026-08-22: returns as soon as the first poll batch yields a
+                // match, instead of waiting through a quiet-confirmation
+                // window to see if the bot sends more - user explicitly chose
+                // "every search fast" over waiting to catch a possible second
+                // person's record arriving later. A reply spread across
+                // multiple messages that don't land in the same ~800ms poll
+                // window will only surface the first one.
                 do {
-                    // A single stuck poll no longer eats the whole request -
-                    // caught and treated as "nothing new this cycle" so the
-                    // outer $deadline (not this call) decides when to give up.
                     try {
                         $history = telegramCallWithTimeout(
                             fn() => $api->messages->getHistory(peer: $peer, min_id: $beforeId, limit: 30),
-                            8, 'a search-results poll'
+                            15, 'a search-results poll'
                         );
                     } catch (RuntimeException $error) {
                         usleep(800000);
@@ -323,14 +369,19 @@ try {
                         $text = trim((string) ($message['message'] ?? ''));
                         if (!$id || isset($seen[$id]) || !empty($message['out']) || !preg_match($pattern, $text)) continue;
                         $seen[$id] = true;
+                        // Belongs to a DIFFERENT concurrent system's query,
+                        // not this one - correctly skipped rather than
+                        // handed back as if it answered this search.
+                        if ($queryNormalized !== '' && !str_contains(preg_replace('/[^a-z0-9]/i', '', $text), $queryNormalized)) {
+                            continue;
+                        }
                         $results[] = [
                             'id' => $id,
                             'text' => cleanTelegramResult($text),
                             'hasMedia' => isset($message['media']),
                         ];
-                        $quietSince = microtime(true);
                     }
-                    if ($results && $quietSince !== null && microtime(true) - $quietSince >= 1.0) break;
+                    if ($results) break;
                     usleep(800000);
                 } while (microtime(true) < $deadline);
 
