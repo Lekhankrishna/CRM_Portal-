@@ -35,33 +35,9 @@ if (!array_filter($params, fn($v) => $v !== '')) {
     exit;
 }
 
-// Single shared monthly plan pool on theeagleeye.biz's side (observed
-// "930 / 1000 searches" in its own navbar, 2026-08-08) - every agent is
-// capped per calendar month (Admin > Agents > "Advance Pan India Monthly
-// Limit") so one agent can't burn through the whole account's plan alone.
-// Admins bypass this entirely, same as RC Print/HP Gas.
-if (($_SESSION['role'] ?? '') !== 'admin') {
-    $stmt = $pdo->prepare('SELECT eagle_eye_monthly_limit FROM users WHERE id = :id');
-    $stmt->execute(['id' => $_SESSION['user_id']]);
-    $limit = (int) $stmt->fetchColumn();
-
-    $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'eagle_eye' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
-    );
-    $stmt->execute(['id' => $_SESSION['user_id']]);
-    $usedThisMonth = (int) $stmt->fetchColumn();
-
-    if ($usedThisMonth >= $limit) {
-        http_response_code(429);
-        echo json_encode([
-            'error' => "Monthly Advance Pan India limit reached ($usedThisMonth/$limit this month). Contact your admin to increase it, or try again next month.",
-            'used' => $usedThisMonth,
-            'limit' => $limit,
-        ]);
-        exit;
-    }
-}
-
+// No monthly cap (removed 2026-08-12, per explicit instruction) - every
+// agent with access gets unlimited Advance Pan India searches. Still logged
+// to search_logs below for Admin > Audit Log either way.
 try {
     $result = eagleEyeSearch($params);
 } catch (Throwable $e) {
@@ -91,18 +67,6 @@ try {
     ]);
 
     archiveEagleEyeResults($result['tables'] ?? [], currentUser()['username'] ?? 'unknown', $queryText);
-
-    if (($_SESSION['role'] ?? '') !== 'admin') {
-        $stmt = $pdo->prepare('SELECT eagle_eye_monthly_limit FROM users WHERE id = :id');
-        $stmt->execute(['id' => $_SESSION['user_id']]);
-        $result['limit'] = (int) $stmt->fetchColumn();
-
-        $stmt = $pdo->prepare(
-            "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'eagle_eye' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
-        );
-        $stmt->execute(['id' => $_SESSION['user_id']]);
-        $result['used'] = (int) $stmt->fetchColumn();
-    }
 } catch (PDOException $e) {}
 
 echo json_encode($result);

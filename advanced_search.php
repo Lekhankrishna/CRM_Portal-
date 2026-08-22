@@ -3,23 +3,6 @@ require __DIR__ . '/includes/auth.php';
 requireAdvancedSearchAccess();
 require_once __DIR__ . '/config/db.php';
 
-// Same quota-badge pattern as rc_print.php/hp_gas.php/advance_pan_india.php.
-$isAdmin = ($_SESSION['role'] ?? '') === 'admin';
-$quota = null;
-if (!$isAdmin) {
-    $stmt = $pdo->prepare('SELECT advanced_search_monthly_limit FROM users WHERE id = :id');
-    $stmt->execute(['id' => $_SESSION['user_id']]);
-    $monthlyLimit = (int) $stmt->fetchColumn();
-
-    $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'advanced_search' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
-    );
-    $stmt->execute(['id' => $_SESSION['user_id']]);
-    $usedThisMonth = (int) $stmt->fetchColumn();
-
-    $quota = ['used' => $usedThisMonth, 'limit' => $monthlyLimit];
-}
-
 $basePath = '';
 require __DIR__ . '/includes/header.php';
 ?>
@@ -30,14 +13,7 @@ require __DIR__ . '/includes/header.php';
 
 <div class="page-header" style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
   <h1 class="page-title" style="margin:0"><i class="bi bi-search"></i> Advanced Search</h1>
-  <?php if ($isAdmin): ?>
-    <span id="asQuotaBadge" class="badge badge-neutral" style="margin-left:auto">Unlimited (Admin)</span>
-  <?php elseif ($quota !== null): ?>
-    <span id="asQuotaBadge" class="badge <?= $quota['used'] >= $quota['limit'] ? 'badge-danger' : 'badge-neutral' ?>"
-          style="margin-left:auto">
-      <?= $quota['limit'] - $quota['used'] > 0 ? $quota['limit'] - $quota['used'] : 0 ?> of <?= $quota['limit'] ?> left this month
-    </span>
-  <?php endif; ?>
+  <span class="badge badge-neutral" style="margin-left:auto">Unlimited</span>
 </div>
 
 <style>

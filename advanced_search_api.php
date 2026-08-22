@@ -32,32 +32,9 @@ if (!isset(TRACEKART_STATES[$state]['modes'][$mode])) {
 }
 $fields = is_array($data['fields'] ?? null) ? $data['fields'] : [];
 
-// Single shared account on tracekart.in's side - every agent is capped per
-// calendar month (Admin > Agents > "Advanced Search Monthly Limit") so one
-// agent can't burn through the whole account's own daily/IP quota alone.
-// Admins bypass this entirely, same as every other tool here.
-if (($_SESSION['role'] ?? '') !== 'admin') {
-    $stmt = $pdo->prepare('SELECT advanced_search_monthly_limit FROM users WHERE id = :id');
-    $stmt->execute(['id' => $_SESSION['user_id']]);
-    $limit = (int) $stmt->fetchColumn();
-
-    $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'advanced_search' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
-    );
-    $stmt->execute(['id' => $_SESSION['user_id']]);
-    $usedThisMonth = (int) $stmt->fetchColumn();
-
-    if ($usedThisMonth >= $limit) {
-        http_response_code(429);
-        echo json_encode([
-            'error' => "Monthly Advanced Search limit reached ($usedThisMonth/$limit this month). Contact your admin to increase it, or try again next month.",
-            'used' => $usedThisMonth,
-            'limit' => $limit,
-        ]);
-        exit;
-    }
-}
-
+// No monthly cap (removed 2026-08-12, per explicit instruction) - every
+// agent with access gets unlimited Advanced Search searches. Still logged
+// to search_logs below for Admin > Audit Log either way.
 try {
     $result = tracekartSearch($state, $mode, $fields);
 } catch (Throwable $e) {
@@ -87,18 +64,6 @@ try {
     ]);
 
     archiveTracekartResults($result['headers'] ?? [], $result['rows'] ?? [], currentUser()['username'] ?? 'unknown', $mode, $queryText);
-
-    if (($_SESSION['role'] ?? '') !== 'admin') {
-        $stmt = $pdo->prepare('SELECT advanced_search_monthly_limit FROM users WHERE id = :id');
-        $stmt->execute(['id' => $_SESSION['user_id']]);
-        $result['limit'] = (int) $stmt->fetchColumn();
-
-        $stmt = $pdo->prepare(
-            "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'advanced_search' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
-        );
-        $stmt->execute(['id' => $_SESSION['user_id']]);
-        $result['used'] = (int) $stmt->fetchColumn();
-    }
 } catch (PDOException $e) {}
 
 echo json_encode($result);
