@@ -277,6 +277,21 @@ try {
         throw new RuntimeException("No Telegram chat matching '{$TELEGRAM_BOT_MATCH}' was found.");
     }
 
+    // Fetched once here instead of on every search (2026-08-22) - this worker
+    // process stays alive across requests, so it can just remember the
+    // highest message ID it has already seen instead of asking Telegram
+    // "what's the latest message?" again before every single search. That
+    // per-search call was its own 25s x 2 retryable round-trip and, per live
+    // testing the same day, one of the calls that timed out and failed
+    // outright during a DC5 slow patch - removing it cuts both a real
+    // latency source and a real failure point from every search after the
+    // first. Updated at the bottom of the search handler below as new
+    // messages are observed, so it never goes stale.
+    $lastMessageId = (int) (telegramCallWithRetry(
+        fn() => $api->messages->getHistory(peer: $peer, limit: 1),
+        25, 2, 'the startup history check'
+    )['messages'][0]['id'] ?? 0);
+
     $server = stream_socket_server('tcp://127.0.0.1:8091', $errorNumber, $errorMessage);
     if ($server === false) {
         throw new RuntimeException("Could not start Telegram worker: {$errorMessage}");
@@ -297,21 +312,10 @@ try {
                 $query = trim((string) ($request['query'] ?? ''));
                 if ($query === '') throw new RuntimeException('Search query is required.');
 
-                // Retried, not just given one long wait - confirmed live
-                // 2026-08-22 across four rounds of testing that raising a
-                // single attempt's cap (10s -> 20s -> 40s) never converged:
-                // whatever the cap was, the worker's own log kept showing
-                // the SAME "Got a response... but there is no request!"
-                // pattern - the call eventually succeeds, just
-                // unpredictably late, sometimes past even a generous cap.
-                // 25s x 2 independent tries costs the same worst-case
-                // ceiling as one 50s wait, but doesn't depend on the FIRST
-                // attempt specifically being the lucky one.
-                $history = telegramCallWithRetry(
-                    fn() => $api->messages->getHistory(peer: $peer, limit: 1),
-                    25, 2, 'the pre-search history check'
-                );
-                $beforeId = (int) ($history['messages'][0]['id'] ?? 0);
+                // $lastMessageId (maintained across searches - see where it's
+                // first fetched, above the server loop) replaces what used to
+                // be a fresh getHistory call here on every single search.
+                $beforeId = $lastMessageId;
                 telegramCallWithRetry(
                     fn() => $api->messages->sendMessage(peer: $peer, message: $query),
                     25, 2, 'sending the search query'
@@ -366,6 +370,12 @@ try {
                     }
                     foreach ($history['messages'] ?? [] as $message) {
                         $id = (int) ($message['id'] ?? 0);
+                        // Advances $lastMessageId for every message actually
+                        // seen (not just ones that end up matching this
+                        // search), so the NEXT search's own $beforeId starts
+                        // from here rather than replaying ground already
+                        // covered.
+                        if ($id > $lastMessageId) $lastMessageId = $id;
                         $text = trim((string) ($message['message'] ?? ''));
                         if (!$id || isset($seen[$id]) || !empty($message['out']) || !preg_match($pattern, $text)) continue;
                         $seen[$id] = true;
