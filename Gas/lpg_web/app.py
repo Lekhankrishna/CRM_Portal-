@@ -8,6 +8,7 @@ import uuid
 from lpg_search import run_bulk_search
 from rc_print import run_rc_print
 from hp_gas import run_hp_gas_single
+from tata_dth import run_tata_dth_single
 
 app = Flask(__name__)
 
@@ -265,6 +266,27 @@ def hp_gas():
         except Exception as e:
             full_trace = traceback.format_exc()
             print(f"[hp-gas {mobile_number}] FAILED:\n{full_trace}")
+            return jsonify({"error": clean_error_message(e)}), 502
+
+    return jsonify(result)
+
+
+@app.route("/api/tata-dth", methods=["POST"])
+def tata_dth():
+    data = request.get_json(silent=True) or {}
+    mobile_number = str(data.get("mobileNumber", "")).strip()
+
+    if not mobile_number:
+        return jsonify({"error": "No mobile number provided"}), 400
+
+    # Same shape as /api/rc-print/hp-gas - single lookup, synchronous,
+    # sharing selenium_semaphore with every other tool here.
+    with selenium_semaphore:
+        try:
+            result = run_tata_dth_single(mobile_number)
+        except Exception as e:
+            full_trace = traceback.format_exc()
+            print(f"[tata-dth {mobile_number}] FAILED:\n{full_trace}")
             return jsonify({"error": clean_error_message(e)}), 502
 
     return jsonify(result)

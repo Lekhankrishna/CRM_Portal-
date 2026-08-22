@@ -27,6 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $panIndiaProMonthlyLimit = min(65535, max(0, (int) ($_POST['pan_india_pro_monthly_limit'] ?? 5)));
         $advancedSearchAccess = isset($_POST['advanced_search_access']) ? 1 : 0;
         $advancedSearchMonthlyLimit = min(65535, max(0, (int) ($_POST['advanced_search_monthly_limit'] ?? 5)));
+        $tataDthAccess = isset($_POST['tata_dth_access']) ? 1 : 0;
+        $tataDthMonthlyLimit = min(65535, max(0, (int) ($_POST['tata_dth_monthly_limit'] ?? 5)));
         $maxSessions = max(1, (int) ($_POST['max_concurrent_sessions'] ?? 1));
         $expiresDate  = trim($_POST['expires_date'] ?? '');
         $expiresTime  = trim($_POST['expires_time'] ?? '') ?: '00:00';
@@ -37,8 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'danger';
         } else {
             $stmt = $pdo->prepare(
-                'INSERT INTO users (username, password_hash, full_name, mobile_no, role, lpg_search_access, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, max_concurrent_sessions, expires_at)
-                 VALUES (:username, :hash, :full_name, :mobile_no, :role, :lpg_access, :rc_print_access, :rc_print_monthly_limit, :hp_gas_access, :hp_gas_monthly_limit, :eagle_eye_access, :eagle_eye_monthly_limit, :pan_india_access, :pan_india_pro_access, :pan_india_pro_monthly_limit, :advanced_search_access, :advanced_search_monthly_limit, :max_sessions, :expires_at)'
+                'INSERT INTO users (username, password_hash, full_name, mobile_no, role, lpg_search_access, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, tata_dth_access, tata_dth_monthly_limit, max_concurrent_sessions, expires_at)
+                 VALUES (:username, :hash, :full_name, :mobile_no, :role, :lpg_access, :rc_print_access, :rc_print_monthly_limit, :hp_gas_access, :hp_gas_monthly_limit, :eagle_eye_access, :eagle_eye_monthly_limit, :pan_india_access, :pan_india_pro_access, :pan_india_pro_monthly_limit, :advanced_search_access, :advanced_search_monthly_limit, :tata_dth_access, :tata_dth_monthly_limit, :max_sessions, :expires_at)'
             );
             try {
                 $stmt->execute([
@@ -59,6 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'pan_india_pro_monthly_limit' => $panIndiaProMonthlyLimit,
                     'advanced_search_access' => $advancedSearchAccess,
                     'advanced_search_monthly_limit' => $advancedSearchMonthlyLimit,
+                    'tata_dth_access' => $tataDthAccess,
+                    'tata_dth_monthly_limit' => $tataDthMonthlyLimit,
                     'max_sessions' => $maxSessions,
                     'expires_at'=> $expiresAtSql,
                 ]);
@@ -93,6 +97,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $panIndiaProMonthlyLimit = min(65535, max(0, (int) ($_POST['pan_india_pro_monthly_limit'] ?? 5)));
         $advancedSearchAccess = isset($_POST['advanced_search_access']) ? 1 : 0;
         $advancedSearchMonthlyLimit = min(65535, max(0, (int) ($_POST['advanced_search_monthly_limit'] ?? 5)));
+        $tataDthAccess = isset($_POST['tata_dth_access']) ? 1 : 0;
+        $tataDthMonthlyLimit = min(65535, max(0, (int) ($_POST['tata_dth_monthly_limit'] ?? 5)));
         $maxSessions = max(1, (int) ($_POST['max_concurrent_sessions'] ?? 1));
         $newPassword  = $_POST['new_password'] ?? '';
         $expiresDate  = trim($_POST['expires_date'] ?? '');
@@ -106,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message     = 'New password must be at least 6 characters (or leave it blank to keep the current one).';
             $messageType = 'danger';
         } else {
-            $sql = 'UPDATE users SET username = :username, full_name = :full_name, mobile_no = :mobile_no, role = :role, lpg_search_access = :lpg_access, rc_print_access = :rc_print_access, rc_print_monthly_limit = :rc_print_monthly_limit, hp_gas_access = :hp_gas_access, hp_gas_monthly_limit = :hp_gas_monthly_limit, eagle_eye_access = :eagle_eye_access, eagle_eye_monthly_limit = :eagle_eye_monthly_limit, pan_india_access = :pan_india_access, pan_india_pro_access = :pan_india_pro_access, pan_india_pro_monthly_limit = :pan_india_pro_monthly_limit, advanced_search_access = :advanced_search_access, advanced_search_monthly_limit = :advanced_search_monthly_limit, max_concurrent_sessions = :max_sessions, expires_at = :expires_at';
+            $sql = 'UPDATE users SET username = :username, full_name = :full_name, mobile_no = :mobile_no, role = :role, lpg_search_access = :lpg_access, rc_print_access = :rc_print_access, rc_print_monthly_limit = :rc_print_monthly_limit, hp_gas_access = :hp_gas_access, hp_gas_monthly_limit = :hp_gas_monthly_limit, eagle_eye_access = :eagle_eye_access, eagle_eye_monthly_limit = :eagle_eye_monthly_limit, pan_india_access = :pan_india_access, pan_india_pro_access = :pan_india_pro_access, pan_india_pro_monthly_limit = :pan_india_pro_monthly_limit, advanced_search_access = :advanced_search_access, advanced_search_monthly_limit = :advanced_search_monthly_limit, tata_dth_access = :tata_dth_access, tata_dth_monthly_limit = :tata_dth_monthly_limit, max_concurrent_sessions = :max_sessions, expires_at = :expires_at';
             $params = [
                 'username'  => $username,
                 'full_name' => $fullName,
@@ -124,6 +130,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'pan_india_pro_monthly_limit' => $panIndiaProMonthlyLimit,
                 'advanced_search_access' => $advancedSearchAccess,
                 'advanced_search_monthly_limit' => $advancedSearchMonthlyLimit,
+                'tata_dth_access' => $tataDthAccess,
+                'tata_dth_monthly_limit' => $tataDthMonthlyLimit,
                 'max_sessions' => $maxSessions,
                 'expires_at'=> $expiresAtSql,
                 'id'        => $id,
@@ -212,7 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $users = $pdo->query(
-    'SELECT id, username, full_name, mobile_no, role, is_active, lpg_search_access, lpg_bookmarklet_key, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, max_concurrent_sessions, expires_at, created_at, last_login_at FROM users ORDER BY created_at DESC'
+    'SELECT id, username, full_name, mobile_no, role, is_active, lpg_search_access, lpg_bookmarklet_key, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, tata_dth_access, tata_dth_monthly_limit, max_concurrent_sessions, expires_at, created_at, last_login_at FROM users ORDER BY created_at DESC'
 )->fetchAll();
 
 // Summary stats for the admin view. "Logged In" counts users who have ever
@@ -387,22 +395,20 @@ require __DIR__ . '/../includes/header.php';
       <label class="acf-feature">
         <input type="checkbox" name="eagle_eye_access" value="1">
         <span>Advance Pan India</span>
-        <span class="acf-limit" title="How many Advance Pan India searches this agent can run per calendar month - shares a single monthly plan pool on theeagleeye.biz. Ignored for admins.">
-          <input type="number" name="eagle_eye_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-        </span>
       </label>
       <label class="acf-feature">
         <input type="checkbox" name="pan_india_pro_access" value="1">
         <span>Night Out</span>
-        <span class="acf-limit" title="How many Night Out searches this agent can run per calendar month - shares a single daily quota on the vendor's side. Ignored for admins.">
-          <input type="number" name="pan_india_pro_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-        </span>
       </label>
       <label class="acf-feature">
         <input type="checkbox" name="advanced_search_access" value="1">
         <span>Advanced Search</span>
-        <span class="acf-limit" title="How many Advanced Search searches this agent can run per calendar month - shares a single account's own daily/IP quota on tracekart.in. Ignored for admins.">
-          <input type="number" name="advanced_search_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
+      </label>
+      <label class="acf-feature">
+        <input type="checkbox" name="tata_dth_access" value="1">
+        <span>Tata Sky DTH Search</span>
+        <span class="acf-limit" title="How many Tata Sky DTH searches this agent can run per calendar month - shares one distributor Siebel PRM login. Ignored for admins.">
+          <input type="number" name="tata_dth_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
         </span>
       </label>
     </div>
@@ -460,6 +466,7 @@ require __DIR__ . '/../includes/header.php';
           <th>Adv. Pan India</th>
           <th>Night Out</th>
           <th>Advanced Search</th>
+          <th>Tata Sky DTH</th>
           <th>Set Expiry</th>
           <th>Actions</th>
         </tr>
@@ -516,24 +523,23 @@ require __DIR__ . '/../includes/header.php';
             <span class="badge <?= $u['eagle_eye_access'] ? 'badge-success' : 'badge-neutral' ?>">
               <?= $u['eagle_eye_access'] ? 'Granted' : 'Not Granted' ?>
             </span>
-            <?php if ($u['eagle_eye_access'] && $u['role'] !== 'admin'): ?>
-              <div class="text-sm text-muted" style="margin-top:2px"><?= (int) $u['eagle_eye_monthly_limit'] ?>/month</div>
-            <?php endif; ?>
           </td>
           <td>
             <span class="badge <?= $u['pan_india_pro_access'] ? 'badge-success' : 'badge-neutral' ?>">
               <?= $u['pan_india_pro_access'] ? 'Granted' : 'Not Granted' ?>
             </span>
-            <?php if ($u['pan_india_pro_access'] && $u['role'] !== 'admin'): ?>
-              <div class="text-sm text-muted" style="margin-top:2px"><?= (int) $u['pan_india_pro_monthly_limit'] ?>/month</div>
-            <?php endif; ?>
           </td>
           <td>
             <span class="badge <?= $u['advanced_search_access'] ? 'badge-success' : 'badge-neutral' ?>">
               <?= $u['advanced_search_access'] ? 'Granted' : 'Not Granted' ?>
             </span>
-            <?php if ($u['advanced_search_access'] && $u['role'] !== 'admin'): ?>
-              <div class="text-sm text-muted" style="margin-top:2px"><?= (int) $u['advanced_search_monthly_limit'] ?>/month</div>
+          </td>
+          <td>
+            <span class="badge <?= $u['tata_dth_access'] ? 'badge-success' : 'badge-neutral' ?>">
+              <?= $u['tata_dth_access'] ? 'Granted' : 'Not Granted' ?>
+            </span>
+            <?php if ($u['tata_dth_access'] && $u['role'] !== 'admin'): ?>
+              <div class="text-sm text-muted" style="margin-top:2px"><?= (int) $u['tata_dth_monthly_limit'] ?>/month</div>
             <?php endif; ?>
           </td>
           <td>
@@ -558,7 +564,7 @@ require __DIR__ . '/../includes/header.php';
           </td>
           <td class="action-cell">
             <button type="button" class="btn btn-sm btn-secondary"
-                    onclick="openEditModal(<?= (int) $u['id'] ?>, <?= htmlspecialchars(json_encode($u['username']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['full_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['mobile_no'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['role']), ENT_QUOTES) ?>, <?= (int) $u['lpg_search_access'] ?>, <?= (int) $u['rc_print_access'] ?>, <?= (int) $u['rc_print_monthly_limit'] ?>, <?= (int) $u['hp_gas_access'] ?>, <?= (int) $u['hp_gas_monthly_limit'] ?>, <?= (int) $u['eagle_eye_access'] ?>, <?= (int) $u['eagle_eye_monthly_limit'] ?>, <?= (int) $u['pan_india_access'] ?>, <?= (int) $u['pan_india_pro_access'] ?>, <?= (int) $u['pan_india_pro_monthly_limit'] ?>, <?= (int) $u['advanced_search_access'] ?>, <?= (int) $u['advanced_search_monthly_limit'] ?>, <?= (int) $u['max_concurrent_sessions'] ?>, <?= htmlspecialchars(json_encode($expiryDateValue), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($expiryTimeValue), ENT_QUOTES) ?>)">
+                    onclick="openEditModal(<?= (int) $u['id'] ?>, <?= htmlspecialchars(json_encode($u['username']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['full_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['mobile_no'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['role']), ENT_QUOTES) ?>, <?= (int) $u['lpg_search_access'] ?>, <?= (int) $u['rc_print_access'] ?>, <?= (int) $u['rc_print_monthly_limit'] ?>, <?= (int) $u['hp_gas_access'] ?>, <?= (int) $u['hp_gas_monthly_limit'] ?>, <?= (int) $u['eagle_eye_access'] ?>, <?= (int) $u['eagle_eye_monthly_limit'] ?>, <?= (int) $u['pan_india_access'] ?>, <?= (int) $u['pan_india_pro_access'] ?>, <?= (int) $u['pan_india_pro_monthly_limit'] ?>, <?= (int) $u['advanced_search_access'] ?>, <?= (int) $u['advanced_search_monthly_limit'] ?>, <?= (int) $u['tata_dth_access'] ?>, <?= (int) $u['tata_dth_monthly_limit'] ?>, <?= (int) $u['max_concurrent_sessions'] ?>, <?= htmlspecialchars(json_encode($expiryDateValue), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($expiryTimeValue), ENT_QUOTES) ?>)">
               <i class="bi bi-pencil-square"></i> Edit
             </button>
             <?php if ($u['lpg_search_access'] && $u['lpg_bookmarklet_key']): ?>
@@ -650,22 +656,20 @@ require __DIR__ . '/../includes/header.php';
           <label class="acf-feature">
             <input type="checkbox" name="eagle_eye_access" id="edit-eagle_eye_access" value="1">
             <span>Advance Pan India</span>
-            <span class="acf-limit" title="How many Advance Pan India searches this agent can run per calendar month - shares a single monthly plan pool on theeagleeye.biz. Ignored for admins.">
-              <input type="number" name="eagle_eye_monthly_limit" id="edit-eagle_eye_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-            </span>
           </label>
           <label class="acf-feature">
             <input type="checkbox" name="pan_india_pro_access" id="edit-pan_india_pro_access" value="1">
             <span>Night Out</span>
-            <span class="acf-limit" title="How many Night Out searches this agent can run per calendar month - shares a single daily quota on the vendor's side. Ignored for admins.">
-              <input type="number" name="pan_india_pro_monthly_limit" id="edit-pan_india_pro_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-            </span>
           </label>
           <label class="acf-feature">
             <input type="checkbox" name="advanced_search_access" id="edit-advanced_search_access" value="1">
             <span>Advanced Search</span>
-            <span class="acf-limit" title="How many Advanced Search searches this agent can run per calendar month - shares a single account's own daily/IP quota on tracekart.in. Ignored for admins.">
-              <input type="number" name="advanced_search_monthly_limit" id="edit-advanced_search_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
+          </label>
+          <label class="acf-feature">
+            <input type="checkbox" name="tata_dth_access" id="edit-tata_dth_access" value="1">
+            <span>Tata Sky DTH Search</span>
+            <span class="acf-limit" title="How many Tata Sky DTH searches this agent can run per calendar month - shares one distributor Siebel PRM login. Ignored for admins.">
+              <input type="number" name="tata_dth_monthly_limit" id="edit-tata_dth_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
             </span>
           </label>
         </div>
@@ -709,7 +713,7 @@ require __DIR__ . '/../includes/header.php';
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
-function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, rcPrintAccess, rcPrintMonthlyLimit, hpGasAccess, hpGasMonthlyLimit, eagleEyeAccess, eagleEyeMonthlyLimit, panIndiaAccess, panIndiaProAccess, panIndiaProMonthlyLimit, advancedSearchAccess, advancedSearchMonthlyLimit, maxSessions, expiresDate, expiresTime) {
+function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, rcPrintAccess, rcPrintMonthlyLimit, hpGasAccess, hpGasMonthlyLimit, eagleEyeAccess, eagleEyeMonthlyLimit, panIndiaAccess, panIndiaProAccess, panIndiaProMonthlyLimit, advancedSearchAccess, advancedSearchMonthlyLimit, tataDthAccess, tataDthMonthlyLimit, maxSessions, expiresDate, expiresTime) {
   document.getElementById('edit-id').value = id;
   document.getElementById('edit-username').value = username;
   document.getElementById('edit-full_name').value = fullName;
@@ -721,12 +725,11 @@ function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, rcPrin
   document.getElementById('edit-hp_gas_access').checked = !!hpGasAccess;
   document.getElementById('edit-hp_gas_monthly_limit').value = hpGasMonthlyLimit;
   document.getElementById('edit-eagle_eye_access').checked = !!eagleEyeAccess;
-  document.getElementById('edit-eagle_eye_monthly_limit').value = eagleEyeMonthlyLimit;
   document.getElementById('edit-pan_india_access').checked = !!panIndiaAccess;
   document.getElementById('edit-pan_india_pro_access').checked = !!panIndiaProAccess;
-  document.getElementById('edit-pan_india_pro_monthly_limit').value = panIndiaProMonthlyLimit;
   document.getElementById('edit-advanced_search_access').checked = !!advancedSearchAccess;
-  document.getElementById('edit-advanced_search_monthly_limit').value = advancedSearchMonthlyLimit;
+  document.getElementById('edit-tata_dth_access').checked = !!tataDthAccess;
+  document.getElementById('edit-tata_dth_monthly_limit').value = tataDthMonthlyLimit;
   document.getElementById('edit-max_concurrent_sessions').value = maxSessions;
   document.getElementById('edit-expires_date').value = expiresDate;
   document.getElementById('edit-expires_time').value = expiresTime;
@@ -845,9 +848,10 @@ const AGENTS_EXPORT_DATA = <?= json_encode(array_map(function ($u) {
         'pan_india' => $u['pan_india_access'] ? 'Granted' : 'Not Granted',
         'rc_print' => $u['rc_print_access'] ? "Granted ({$u['rc_print_monthly_limit']}/mo)" : 'Not Granted',
         'hp_gas' => $u['hp_gas_access'] ? "Granted ({$u['hp_gas_monthly_limit']}/mo)" : 'Not Granted',
-        'adv_pan_india' => $u['eagle_eye_access'] ? "Granted ({$u['eagle_eye_monthly_limit']}/mo)" : 'Not Granted',
-        'pan_india_pro' => $u['pan_india_pro_access'] ? "Granted ({$u['pan_india_pro_monthly_limit']}/mo)" : 'Not Granted',
-        'advanced_search' => $u['advanced_search_access'] ? "Granted ({$u['advanced_search_monthly_limit']}/mo)" : 'Not Granted',
+        'adv_pan_india' => $u['eagle_eye_access'] ? 'Granted' : 'Not Granted',
+        'pan_india_pro' => $u['pan_india_pro_access'] ? 'Granted' : 'Not Granted',
+        'advanced_search' => $u['advanced_search_access'] ? 'Granted' : 'Not Granted',
+        'tata_dth' => $u['tata_dth_access'] ? "Granted ({$u['tata_dth_monthly_limit']}/mo)" : 'Not Granted',
         'max_logins' => $u['max_concurrent_sessions'],
         'expires_at' => $u['expires_at'] ? date('d/m/Y H:i', strtotime($u['expires_at'])) : 'No expiry',
         'created_at' => $u['created_at'] ? date('d/m/Y H:i', strtotime($u['created_at'])) : '',
@@ -856,10 +860,10 @@ const AGENTS_EXPORT_DATA = <?= json_encode(array_map(function ($u) {
 }, $users), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 
 document.getElementById('export-accounts-btn').addEventListener('click', () => {
-  const headers = ['ID', 'Username', 'Full Name', 'Mobile Number', 'Role', 'Status', 'LPG', 'Pan India', 'RC Print', 'HP Gas', 'Adv. Pan India', 'Night Out', 'Advanced Search', 'Max Logins', 'Expiry', 'Created At', 'Last Login'];
+  const headers = ['ID', 'Username', 'Full Name', 'Mobile Number', 'Role', 'Status', 'LPG', 'Pan India', 'RC Print', 'HP Gas', 'Adv. Pan India', 'Night Out', 'Advanced Search', 'Tata Sky DTH', 'Max Logins', 'Expiry', 'Created At', 'Last Login'];
   const aoa = [headers, ...AGENTS_EXPORT_DATA.map(u => [
     u.id, u.username, u.full_name, u.mobile_no, u.role, u.status, u.lpg, u.pan_india,
-    u.rc_print, u.hp_gas, u.adv_pan_india, u.pan_india_pro, u.advanced_search, u.max_logins, u.expires_at, u.created_at, u.last_login_at,
+    u.rc_print, u.hp_gas, u.adv_pan_india, u.pan_india_pro, u.advanced_search, u.tata_dth, u.max_logins, u.expires_at, u.created_at, u.last_login_at,
   ])];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
