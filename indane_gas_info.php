@@ -273,18 +273,34 @@ function buildIndaneGasTable(records) {
   thead.appendChild(headRow);
   table.appendChild(thead);
 
-  const tbody = document.createElement("tbody");
+  // locateme.services splits ONE person's data across several separate
+  // cards (confirmed live 2026-08-23: a single search came back as 5
+  // records - Consumer Detail fields in one, Agency Detail fields in
+  // another, empty placeholders in the rest) rather than one card with
+  // everything - one row per raw record showed the same Consumer Id/Name/
+  // Address repeated across rows with the agency columns blank, then a
+  // separate row with only agency columns filled. Merged into a single
+  // field map across every record in the response first, so the columns
+  // that came from a different card still land in the same row as the
+  // rest of that person's data - one result row per search, not one per
+  // fragment.
+  const merged = new Map();
   records.forEach(record => {
-    const fieldMap = new Map();
-    (record.fields || []).forEach(f => fieldMap.set((f.label || "").trim().toLowerCase(), f.value || ""));
-    const tr = document.createElement("tr");
-    IG_COLUMNS.forEach(col => {
-      const td = document.createElement("td");
-      td.textContent = fieldMap.get(col.toLowerCase()) || "—";
-      tr.appendChild(td);
+    (record.fields || []).forEach(f => {
+      const label = (f.label || "").trim().toLowerCase();
+      const value = (f.value || "").trim();
+      if (value && !merged.get(label)) merged.set(label, value);
     });
-    tbody.appendChild(tr);
   });
+
+  const tbody = document.createElement("tbody");
+  const tr = document.createElement("tr");
+  IG_COLUMNS.forEach(col => {
+    const td = document.createElement("td");
+    td.textContent = merged.get(col.toLowerCase()) || "—";
+    tr.appendChild(td);
+  });
+  tbody.appendChild(tr);
   table.appendChild(tbody);
   return table;
 }
@@ -302,7 +318,9 @@ function renderResult(data) {
 
   if (records.length) {
     lastRecords = records;
-    resultCountText.textContent = `${records.length} result${records.length === 1 ? "" : "s"} found`;
+    // One merged row regardless of how many fragments the backend
+    // returned - see buildIndaneGasTable()'s own comment.
+    resultCountText.textContent = "1 result found";
     const wrap = document.createElement("div");
     wrap.className = "results-table-wrap";
     wrap.appendChild(buildIndaneGasTable(records));
@@ -323,19 +341,36 @@ function renderResult(data) {
 
 // Export matches what's actually shown - just IG_COLUMNS, not every field
 // locateme.services returns, same "hide the rest" instruction as the table.
+// Grouped by section (one group per searched number in bulk mode; a single
+// implicit group for a single search) and merged the same way
+// buildIndaneGasTable() does, so this has exactly one row per search - not
+// one per raw fragment locateme.services returned for that person.
 exportBtn.addEventListener("click", () => {
   if (!lastRecords.length) return;
   const hasSection = lastRecords.some(r => r.section);
   const columns = hasSection ? ["Number", ...IG_COLUMNS] : [...IG_COLUMNS];
 
-  const aoa = [columns, ...lastRecords.map(r => {
-    const fieldMap = new Map();
-    (r.fields || []).forEach(f => fieldMap.set((f.label || "").trim().toLowerCase(), f.value || ""));
+  const groups = new Map();
+  lastRecords.forEach(r => {
+    const key = r.section || "";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  });
+
+  const aoa = [columns];
+  groups.forEach((groupRecords, section) => {
+    const merged = new Map();
+    groupRecords.forEach(r => (r.fields || []).forEach(f => {
+      const label = (f.label || "").trim().toLowerCase();
+      const value = (f.value || "").trim();
+      if (value && !merged.get(label)) merged.set(label, value);
+    }));
     const row = [];
-    if (hasSection) row.push(r.section || "");
-    IG_COLUMNS.forEach(col => row.push(fieldMap.get(col.toLowerCase()) || ""));
-    return row;
-  })];
+    if (hasSection) row.push(section);
+    IG_COLUMNS.forEach(col => row.push(merged.get(col.toLowerCase()) || ""));
+    aoa.push(row);
+  });
+
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Result");
@@ -472,6 +507,7 @@ if (tabSingle) {
     bulkProgressWrap.style.display = "block";
     const startedAt = Date.now();
     let foundAny = false;
+    let foundCount = 0;
 
     for (let i = 0; i < numbers.length; i++) {
       const number = numbers[i];
@@ -515,6 +551,7 @@ if (tabSingle) {
           recordsWrap.appendChild(wrap);
           lastRecords = lastRecords.concat(records.map(r => ({ ...r, section: number })));
           foundAny = true;
+          foundCount++;
         } else {
           const empty = document.createElement("div");
           empty.className = "ig-result-count";
@@ -537,7 +574,11 @@ if (tabSingle) {
 
     bulkProgressLabel.textContent = `${numbers.length} number${numbers.length === 1 ? "" : "s"} searched`;
     bulkProgressEta.textContent = `Done in ${formatDuration((Date.now() - startedAt) / 1000)}`;
-    resultCountText.textContent = `${lastRecords.length} result${lastRecords.length === 1 ? "" : "s"} found across ${numbers.length} number${numbers.length === 1 ? "" : "s"}`;
+    // foundCount (one merged result per searched number that found
+    // anything), not lastRecords.length - that still holds every raw
+    // fragment locateme.services returned per number (see
+    // buildIndaneGasTable()'s own comment on why those get merged).
+    resultCountText.textContent = `${foundCount} result${foundCount === 1 ? "" : "s"} found across ${numbers.length} number${numbers.length === 1 ? "" : "s"}`;
     resultWrap.style.display = "block";
     exportBtn.disabled = lastRecords.length === 0;
     setBulkSearching(false);
