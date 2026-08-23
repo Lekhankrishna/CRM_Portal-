@@ -13,6 +13,7 @@ require __DIR__ . '/includes/header.php';
 
 <div class="page-header" style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
   <h1 class="page-title" style="margin:0"><i class="bi bi-globe-asia-australia"></i> Advance Pan India</h1>
+  <span class="badge badge-neutral" style="margin-left:auto">Unlimited</span>
 </div>
 
 <style>

@@ -34,6 +34,9 @@ if (!array_filter($params, fn($v) => $v !== '')) {
     exit;
 }
 
+// No monthly cap (removed 2026-08-12, per explicit instruction) - every
+// agent with access gets unlimited Night Out searches. Still logged to
+// search_logs below for Admin > Audit Log either way.
 try {
     $result = panIndiaProSearch($params);
 } catch (Throwable $e) {

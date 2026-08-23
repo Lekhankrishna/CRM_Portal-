@@ -53,6 +53,51 @@ function telegramRetryAfterCancellation(callable $operation, int $attempts = 12)
     throw new RuntimeException('Telegram login hand-off did not complete.');
 }
 
+// Bounds a single MadelineProto call so it can never freeze the whole worker.
+// Confirmed live 2026-08-22: $api->messages->getHistory()/sendMessage() in
+// the search handler below have no timeout of their own - when one hangs
+// (seen with no exception, no log output, nothing - a true deadlock, not a
+// slow response), stream_socket_accept()'s outer while loop never returns to
+// accept a new connection either, so EVERY subsequent request queues up
+// behind the frozen one until the whole process is killed and restarted.
+// Amp\TimeoutCancellation is the same event loop this file's MadelineProto
+// calls already run on (Revolt), so it can actually interrupt a stuck call
+// instead of just racing it from a separate thread.
+function telegramCallWithTimeout(callable $operation, float $seconds, string $label): mixed
+{
+    try {
+        return \Amp\async($operation)->await(new \Amp\TimeoutCancellation($seconds));
+    } catch (\Amp\CancelledException $error) {
+        throw new RuntimeException("Timed out waiting for $label (>{$seconds}s).", 0, $error);
+    }
+}
+
+// Retries with a FRESH call instead of just waiting longer on one attempt.
+// Confirmed live 2026-08-22, repeatedly: DC 5 (this peer's datacenter) is
+// not consistently slow by some fixed amount - it's unpredictable, and
+// raising a single attempt's timeout (10s -> 20s -> 40s, each time with
+// live confirmation the old cap was too tight) never converged, because
+// the worker's own log kept showing the SAME pattern at whatever the new,
+// higher cap was: "Got a response... but there is no request!" - i.e. the
+// call DOES eventually succeed, just unpredictably late, sometimes past
+// even a generous cap. A second independent attempt has empirically been
+// fast when tried standalone (this file's own history: several single-shot
+// runs completed in 26-51s on the first try), so two shorter, independent
+// tries costs the same worst-case ceiling as one long wait but doesn't
+// require the FIRST attempt specifically to be the one that succeeds.
+function telegramCallWithRetry(callable $operation, float $perAttemptSeconds, int $attempts, string $label): mixed
+{
+    $lastError = null;
+    for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+        try {
+            return telegramCallWithTimeout($operation, $perAttemptSeconds, $label);
+        } catch (RuntimeException $error) {
+            $lastError = $error;
+        }
+    }
+    throw $lastError;
+}
+
 function cleanTelegramResult(string $text): string
 {
     $lines = preg_split('/\R/u', $text) ?: [];
@@ -232,6 +277,21 @@ try {
         throw new RuntimeException("No Telegram chat matching '{$TELEGRAM_BOT_MATCH}' was found.");
     }
 
+    // Fetched once here instead of on every search (2026-08-22) - this worker
+    // process stays alive across requests, so it can just remember the
+    // highest message ID it has already seen instead of asking Telegram
+    // "what's the latest message?" again before every single search. That
+    // per-search call was its own 25s x 2 retryable round-trip and, per live
+    // testing the same day, one of the calls that timed out and failed
+    // outright during a DC5 slow patch - removing it cuts both a real
+    // latency source and a real failure point from every search after the
+    // first. Updated at the bottom of the search handler below as new
+    // messages are observed, so it never goes stale.
+    $lastMessageId = (int) (telegramCallWithRetry(
+        fn() => $api->messages->getHistory(peer: $peer, limit: 1),
+        25, 2, 'the startup history check'
+    )['messages'][0]['id'] ?? 0);
+
     $server = stream_socket_server('tcp://127.0.0.1:8091', $errorNumber, $errorMessage);
     if ($server === false) {
         throw new RuntimeException("Could not start Telegram worker: {$errorMessage}");
@@ -252,15 +312,48 @@ try {
                 $query = trim((string) ($request['query'] ?? ''));
                 if ($query === '') throw new RuntimeException('Search query is required.');
 
-                $history = $api->messages->getHistory(peer: $peer, limit: 1);
-                $beforeId = (int) ($history['messages'][0]['id'] ?? 0);
-                $api->messages->sendMessage(peer: $peer, message: $query);
+                // $lastMessageId (maintained across searches - see where it's
+                // first fetched, above the server loop) replaces what used to
+                // be a fresh getHistory call here on every single search.
+                $beforeId = $lastMessageId;
+                telegramCallWithRetry(
+                    fn() => $api->messages->sendMessage(peer: $peer, message: $query),
+                    25, 2, 'sending the search query'
+                );
 
+                // Concurrent-user correctness check: this account is shared
+                // by 5 other systems all messaging the SAME bot chat, so
+                // messages polled after $beforeId can include another
+                // system's own query/reply, not just this one's. Without
+                // this, the first field-shaped message to show up wins,
+                // which risks handing one agent a DIFFERENT person's search
+                // result. $queryDigits is compared against each candidate
+                // reply so only a message that actually contains the
+                // searched value gets accepted - a false match is skipped
+                // (not returned, not counted toward quietSince), and
+                // polling keeps going for the real one instead.
+                $queryNormalized = preg_replace('/[^a-z0-9]/i', '', $query);
                 $pattern = '/telephone\s*:|email\s*:|aadhaar(?:\s+number)?\s*:|(?:address|adres)\s*:|full\s*name\s*:|name\s+of\s+the\s+father\s*:/i';
-                $deadline = microtime(true) + 20;
+                // 40s (not 20s) - same DC-5-is-just-slow finding as the two
+                // calls above applies here too: at the old 20s budget and
+                // an 8s per-poll cap, a run where individual polls are
+                // running slow gets through only ~2 attempts before giving
+                // up, nowhere near enough chances to actually see the bot's
+                // reply.
+                $deadline = microtime(true) + 40;
                 $results = [];
                 $seen = [];
-                $quietSince = null;
+                // True once at least one poll actually got a response from
+                // Telegram (2026-08-23) - confirmed live during a DC5 slow
+                // patch that EVERY poll in the loop can time out at the 15s
+                // cap, all the way to $deadline, without the bot's reply
+                // ever having been checked for at all. Before this flag,
+                // that indistinguishably fell through to the same
+                // 'ok:true, results:[]' response as a genuine "not in the
+                // database" - actively misleading, since an agent sees "No
+                // matching records found" for a number that may well exist,
+                // with no sign the search never actually completed.
+                $anyPollSucceeded = false;
                 // Polling messages.getHistory this often used to trip Telegram's
                 // own flood control - confirmed 2026-07-30 in
                 // telegram-worker-output.log ("Flood, waiting 11 seconds before
@@ -268,28 +361,61 @@ try {
                 // far more time than it saved. 800ms is the fastest cadence
                 // observed to stay clear of that penalty, so it's untouched -
                 // do NOT lower it without re-testing against the live bot.
-                // The quiet-confirmation window (2026-08-17, "too slow") is a
-                // pure local wait *after* the bot has already replied, so it's
-                // safe to trim independently: 1.5s -> 1.0s, still comfortably
-                // more than one poll cycle (so a second confirmation poll
-                // always happens), just shaves ~0.5s off every search.
+                //
+                // 2026-08-22: returns as soon as the first poll batch yields a
+                // match, instead of waiting through a quiet-confirmation
+                // window to see if the bot sends more - user explicitly chose
+                // "every search fast" over waiting to catch a possible second
+                // person's record arriving later. A reply spread across
+                // multiple messages that don't land in the same ~800ms poll
+                // window will only surface the first one.
                 do {
-                    $history = $api->messages->getHistory(peer: $peer, min_id: $beforeId, limit: 30);
+                    try {
+                        $history = telegramCallWithTimeout(
+                            fn() => $api->messages->getHistory(peer: $peer, min_id: $beforeId, limit: 30),
+                            15, 'a search-results poll'
+                        );
+                    } catch (RuntimeException $error) {
+                        usleep(800000);
+                        continue;
+                    }
+                    $anyPollSucceeded = true;
                     foreach ($history['messages'] ?? [] as $message) {
                         $id = (int) ($message['id'] ?? 0);
+                        // Advances $lastMessageId for every message actually
+                        // seen (not just ones that end up matching this
+                        // search), so the NEXT search's own $beforeId starts
+                        // from here rather than replaying ground already
+                        // covered.
+                        if ($id > $lastMessageId) $lastMessageId = $id;
                         $text = trim((string) ($message['message'] ?? ''));
                         if (!$id || isset($seen[$id]) || !empty($message['out']) || !preg_match($pattern, $text)) continue;
                         $seen[$id] = true;
+                        // Belongs to a DIFFERENT concurrent system's query,
+                        // not this one - correctly skipped rather than
+                        // handed back as if it answered this search.
+                        if ($queryNormalized !== '' && !str_contains(preg_replace('/[^a-z0-9]/i', '', $text), $queryNormalized)) {
+                            continue;
+                        }
                         $results[] = [
                             'id' => $id,
                             'text' => cleanTelegramResult($text),
                             'hasMedia' => isset($message['media']),
                         ];
-                        $quietSince = microtime(true);
                     }
-                    if ($results && $quietSince !== null && microtime(true) - $quietSince >= 1.0) break;
+                    if ($results) break;
                     usleep(800000);
                 } while (microtime(true) < $deadline);
+
+                // Every poll attempt timed out - the reply was never actually
+                // checked for, so "no results" would be a lie, not a real
+                // answer. Distinct error (not just falling through to
+                // ok:true/results:[]) so the UI shows "search failed, try
+                // again" instead of "no matching records found", which for a
+                // real, existing number is actively wrong.
+                if (!$results && !$anyPollSucceeded) {
+                    throw new RuntimeException('Could not check for a reply - every poll attempt timed out.');
+                }
 
                 usort($results, fn(array $a, array $b): int => $a['id'] <=> $b['id']);
                 $response = ['ok' => true, 'results' => $results];

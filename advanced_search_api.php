@@ -32,6 +32,9 @@ if (!isset(TRACEKART_STATES[$state]['modes'][$mode])) {
 }
 $fields = is_array($data['fields'] ?? null) ? $data['fields'] : [];
 
+// No monthly cap (removed 2026-08-12, per explicit instruction) - every
+// agent with access gets unlimited Advanced Search searches. Still logged
+// to search_logs below for Admin > Audit Log either way.
 try {
     $result = tracekartSearch($state, $mode, $fields);
 } catch (Throwable $e) {

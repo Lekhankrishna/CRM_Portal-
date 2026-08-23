@@ -243,7 +243,7 @@ function requireTataPlayAccess(string $loginPath = 'login.php'): void {
     requireLogin($loginPath);
     if (!hasTataPlayAccess()) {
         http_response_code(403);
-        die('Access denied: Tata Play Search access has not been granted for this account.');
+        die('Access denied: Tata Sky DTH Search access has not been granted for this account.');
     }
 }
 

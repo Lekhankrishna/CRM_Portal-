@@ -394,7 +394,13 @@ def _get_last_recharge_date(driver, wait):
             # value - "Payments" is what an EVD/recharge transaction is typed
             # as here; "NRC" (Non-Recurring Charge - activation fee, rental,
             # etc.) is a one-time fee, not a recharge, so it's excluded even
-            # though it's also money changing hands.
+            # though it's also money changing hands. Confirmed live
+            # 2026-08-23: a Deactivated/Pending account's grid renders one
+            # entirely empty placeholder row (jqGrid's own "no data" shape,
+            # not a scraping failure) rather than zero rows - the empty
+            # type/date on it never matches "payment"/"recharge" so it's
+            # correctly skipped, same as it would be for a real account with
+            # genuinely no transaction history yet.
             type_value = cells[type_col].text.strip().lower()
             if "payment" not in type_value and "recharge" not in type_value:
                 continue

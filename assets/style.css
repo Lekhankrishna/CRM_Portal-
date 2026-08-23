@@ -141,11 +141,7 @@ code{
   text-decoration:none;font-weight:800;font-size:15px;letter-spacing:-.2px;
 }
 .sidebar__brand-icon{
-  width:30px;height:30px;flex-shrink:0;
-  background:var(--c-accent-light);
-  border:1px solid var(--c-border);border-radius:10px;
-  display:flex;align-items:center;justify-content:center;font-size:14px;
-  color:var(--c-accent);
+  width:44px;height:44px;flex-shrink:0;object-fit:contain;
 }
 .sidebar__hamburger{
   background:none;border:none;color:var(--c-text-muted);font-size:18px;
@@ -163,6 +159,9 @@ code{
   border-left:3px solid transparent;
   transition:background var(--t),color var(--t),border-color var(--t);cursor:pointer;
 }
+/* Bold only for the Advanced Search link, per explicit instruction - every
+   other sidebar item stays at the normal 500 weight above. */
+.sidebar__item[href="advanced_search.php"]{font-weight:700;}
 .sidebar__item:hover{background:var(--c-surface-2);color:var(--c-text);}
 .sidebar__item.active{background:var(--c-accent-light);color:var(--c-accent);border-left-color:var(--c-accent);font-weight:700;}
 .sidebar__avatar{
@@ -927,11 +926,8 @@ body.login-page::before{
 }
 .login-logo{text-align:center;margin-bottom:32px;}
 .login-logo__icon{
-  width:60px;height:60px;
-  background:linear-gradient(135deg,var(--c-accent-hover),var(--c-accent));
-  border-radius:18px;display:inline-flex;align-items:center;justify-content:center;
-  font-size:26px;color:#ffffff;margin-bottom:14px;
-  box-shadow:0 10px 28px rgba(79,70,229,.4);
+  width:100px;height:100px;object-fit:contain;
+  display:inline-block;margin-bottom:14px;
 }
 .login-logo__title{font-size:24px;font-weight:800;color:var(--c-text);margin:0 0 5px;letter-spacing:-.3px;}
 .login-logo__sub{margin:0;color:var(--c-text-muted);font-size:13px;}

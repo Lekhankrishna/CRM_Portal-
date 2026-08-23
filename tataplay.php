@@ -36,26 +36,6 @@ require __DIR__ . '/includes/header.php';
   @keyframes tp-progress-stripes{from{background-position:0 0;}to{background-position:-34px 0;}}
   .tp-progress-meta{display:flex;justify-content:space-between;margin-top:6px;font-size:11.5px;color:#999;}
   .tp-result-wrap{margin-top:16px;display:none;}
-  .tp-section{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;}
-  .tp-section-title{padding:10px 16px;background:#4f46e5;color:#fff;font-size:11.5px;font-weight:700;
-    text-transform:uppercase;letter-spacing:.4px;}
-  /* One card (.tp-section) holds three of these groups - Subscriber
-     Details/Address/Digicard, same breakdown the real portal itself
-     shows (confirmed live 2026-08-19) - each with its own small heading
-     and field table rather than one flat list of ~20 rows. */
-  .tp-subsection-title{padding:10px 16px 4px;font-size:10.5px;font-weight:700;text-transform:uppercase;
-    letter-spacing:.4px;color:#4f46e5;}
-  .tp-section-table{width:100%;border-collapse:collapse;}
-  .tp-section-table tr:nth-child(odd){background:#fff;}
-  .tp-section-table tr:nth-child(even){background:#f8f8fc;}
-  .tp-section-table td{padding:8px 16px;font-size:12.5px;border-bottom:1px solid #eee;vertical-align:top;}
-  .tp-section-table tr:last-child td{border-bottom:none;}
-  .tp-field-label{width:38%;color:#777;font-weight:600;}
-  .tp-field-value{color:#222;font-weight:500;word-break:break-word;}
-  .tp-status-chip{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
-    text-transform:uppercase;letter-spacing:.3px;background:#eeeef6;color:#555;}
-  .tp-status-chip.tp-status-active{background:rgba(16,185,129,.15);color:#0d9668;}
-  .tp-status-chip.tp-status-bad{background:rgba(248,113,113,.15);color:#dc2626;}
   .tp-not-found{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:16px;color:#f87171;font-weight:600;}
 </style>
 
@@ -130,96 +110,90 @@ function stopProgress(finalLabel) {
   }
 }
 
-// Account Status values seen live (2026-08-13): Pending, Deactivated,
-// Cancelled, Cancel-Pending, WrittenOff - "Pending"/anything containing
-// "active" reads as a live-ish account, "cancel"/"written off"/"deactivat"
-// as a dead one; anything else stays a neutral grey chip rather than
-// guessing at a colour for a status this hasn't seen yet.
-function statusChipClass(status) {
-  const s = (status || "").toLowerCase();
-  if (s.includes("cancel") || s.includes("deactivat") || s.includes("writtenoff") || s.includes("written off")) {
-    return "tp-status-bad";
-  }
-  if (s === "pending" || s.includes("active")) return "tp-status-active";
-  return "";
-}
+// Only these fields are shown, in this order - Digicard/set-top-box
+// details (Product, Digicard #, Digicomp #, etc.) are dropped entirely per
+// explicit instruction (2026-08-23). Each entry pairs the display column
+// with the matching key on the account object (see Gas/lpg_web/
+// tataplay.py's run_tataplay_single() for the full shape).
+const TP_COLUMNS = [
+  ["Subscriber Name", "accountName"],
+  ["Subscriber Id", "subscriberId"],
+  ["Status", "accountStatus"],
+  ["Account Type", "accountType"],
+  ["Account Category", "accountCategory"],
+  ["Account Sub-Category", "accountSubCategory"],
+  ["Sales Segment", "salesSegment"],
+  ["Address Line 1", "addressLine1"],
+  ["Address Line 2", "addressLine2"],
+  ["Village/Town/City", "villageTownCity"],
+  ["Town", "town"],
+  ["District", "district"],
+  ["Tahsil", "tahsil"],
+  ["State", "state"],
+  ["Pin Code", "pinCode"],
+  ["Last Recharge Date", "lastRechargeDate"],
+];
 
 // A search can genuinely match more than one account for the same mobile
 // number (confirmed live 2026-08-19 - a deactivated account and a pending
-// one for the same person) - each gets its own card instead of assuming
-// there's only ever one, same shape as Gas/lpg_web/tataplay.py's
-// run_tataplay_single(). Each card is split into the same three groups
-// the real Tata Play portal itself shows (confirmed live 2026-08-19):
-// Subscriber Details, Address, and the Digicard/set-top-box record.
-function buildFieldTable(rows) {
+// one for the same person) - each is a real, distinct account (different
+// Subscriber Id/Status), not a fragment of one record, so each gets its
+// own row rather than being merged together the way Indane Gas's
+// same-person fragments are. Same weighted colgroup sizing as pan_india.php/
+// indane_gas_info.php's tables (via .pan-results-table) so long address
+// values wrap within their cell instead of forcing a horizontal scroll.
+function buildTataPlayTable(accounts) {
+  const rows = accounts.map(account => TP_COLUMNS.map(([, key]) => account[key] || "—"));
+
+  const longestToken = value => value.split(/[\s,;]+/).reduce((max, tok) => Math.max(max, tok.length), 0);
+  const rawWeights = TP_COLUMNS.map(([label], i) => {
+    let maxLen = label.length;
+    let maxToken = label.length;
+    rows.forEach(r => {
+      const v = r[i] === "—" ? "" : r[i];
+      maxLen = Math.max(maxLen, v.length);
+      maxToken = Math.max(maxToken, longestToken(v));
+    });
+    return Math.max(Math.sqrt(maxLen) * 5, label.length * 1.5, maxToken * 3.2, 16);
+  });
+  const rawTotal = rawWeights.reduce((a, b) => a + b, 0);
+  const cap = rawTotal * 0.22;
+  const weights = rawWeights.map(w => Math.min(w, cap));
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+
   const table = document.createElement("table");
-  table.className = "tp-section-table";
+  table.className = "results-table pan-results-table";
+
+  const colgroup = document.createElement("colgroup");
+  weights.forEach(w => {
+    const col = document.createElement("col");
+    col.style.width = (w / totalWeight * 100).toFixed(2) + "%";
+    colgroup.appendChild(col);
+  });
+  table.appendChild(colgroup);
+
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  TP_COLUMNS.forEach(([label]) => {
+    const th = document.createElement("th");
+    th.textContent = label;
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
   const tbody = document.createElement("tbody");
-  rows.forEach(([label, value]) => {
+  rows.forEach(r => {
     const tr = document.createElement("tr");
-    const labelTd = document.createElement("td");
-    labelTd.className = "tp-field-label";
-    labelTd.textContent = label;
-    const valueTd = document.createElement("td");
-    valueTd.className = "tp-field-value";
-    if (label === "Status" || label === "Digicard Status") {
-      const chip = document.createElement("span");
-      chip.className = "tp-status-chip " + statusChipClass(value);
-      chip.textContent = value || "—";
-      valueTd.appendChild(chip);
-    } else {
-      valueTd.textContent = value || "—";
-    }
-    tr.append(labelTd, valueTd);
+    r.forEach(value => {
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.appendChild(td);
+    });
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
   return table;
-}
-
-function buildSubsectionHeading(text) {
-  const h = document.createElement("div");
-  h.className = "tp-subsection-title";
-  h.textContent = text;
-  return h;
-}
-
-function buildAccountCard(account, heading) {
-  const box = document.createElement("div");
-  box.className = "tp-section";
-  const title = document.createElement("div");
-  title.className = "tp-section-title";
-  title.textContent = heading;
-  box.appendChild(title);
-
-  box.appendChild(buildSubsectionHeading("Subscriber Details"));
-  box.appendChild(buildFieldTable([
-    ["Subscriber Name", account.accountName],
-    ["Subscriber Id", account.subscriberId],
-    ["Status", account.accountStatus],
-    ["Account Type", account.accountType],
-    ["Account Category", account.accountCategory],
-    ["Account Sub-Category", account.accountSubCategory],
-    ["Sales Segment", account.salesSegment],
-  ]));
-
-  box.appendChild(buildSubsectionHeading("Address"));
-  box.appendChild(buildFieldTable([
-    ["Address Line 1", account.addressLine1],
-    ["Address Line 2", account.addressLine2],
-    ["Village/Town/City", account.villageTownCity],
-    ["Town", account.town],
-    ["District", account.district],
-    ["Tahsil", account.tahsil],
-    ["State", account.state],
-    ["Pin Code", account.pinCode],
-  ]));
-
-  box.appendChild(buildFieldTable([
-    ["Last Recharge Date", account.lastRechargeDate],
-  ]));
-
-  return box;
 }
 
 function renderResult(data) {
@@ -229,19 +203,11 @@ function renderResult(data) {
 
   if (!accounts.length) {
     resultWrap.innerHTML = `<div class="tp-not-found">Not found for ${data.mobileNumber}.</div>`;
-  } else if (accounts.length === 1) {
-    resultWrap.appendChild(buildAccountCard(accounts[0], "Account"));
   } else {
-    const notice = document.createElement("div");
-    notice.className = "tp-section-title";
-    notice.style.cssText = "background:none;color:#777;padding:0 0 8px;text-transform:none;font-weight:600;";
-    notice.textContent = `${accounts.length} accounts matched this number - showing all of them.`;
-    resultWrap.appendChild(notice);
-    accounts.forEach((account, i) => {
-      const card = buildAccountCard(account, `Account ${i + 1} of ${accounts.length}`);
-      card.style.marginTop = i > 0 ? "14px" : "0";
-      resultWrap.appendChild(card);
-    });
+    const wrap = document.createElement("div");
+    wrap.className = "results-table-wrap";
+    wrap.appendChild(buildTataPlayTable(accounts));
+    resultWrap.appendChild(wrap);
   }
 
   resultWrap.style.display = "block";
