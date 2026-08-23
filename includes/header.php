@@ -169,7 +169,7 @@ $expiresLabel = $expiresAt ? date('d-F-Y', strtotime($expiresAt)) : null;
   <aside class="sidebar" id="sidebar">
     <div class="sidebar__top">
       <a class="sidebar__brand" href="<?= $bp ?>index.php">
-        <img class="sidebar__brand-icon" src="<?= $bp ?>assets/logo.jpg" alt="CRM Portal">
+        <div class="sidebar__brand-icon"><i class="bi bi-diagram-3-fill"></i></div>
         CRM Portal
       </a>
       <button class="sidebar__hamburger" id="sidebar-toggle" type="button" aria-label="Toggle menu">

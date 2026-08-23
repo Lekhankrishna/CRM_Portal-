@@ -83,7 +83,9 @@ if ($error === '' && ($_GET['reason'] ?? '') === 'session_replaced') {
     <div class="login-box">
 
       <div class="login-logo">
-        <img class="login-logo__icon" src="assets/logo.jpg" alt="CRM Portal">
+        <div class="login-logo__icon">
+          <i class="bi bi-diagram-3-fill"></i>
+        </div>
         <h1 class="login-logo__title">CRM Portal</h1>
         <p class="login-logo__sub">Secure sign-in to your account</p>
       </div>
