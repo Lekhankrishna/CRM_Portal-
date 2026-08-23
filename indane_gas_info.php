@@ -259,27 +259,42 @@ const IG_COLUMNS = [
   "Main Product", "Category",
 ];
 
-function buildIndaneGasTable(records) {
-  // locateme.services splits ONE person's data across several separate
-  // cards (confirmed live 2026-08-23: a single search came back as 5
-  // records - Consumer Detail fields in one, Agency Detail fields in
-  // another, empty placeholders in the rest) rather than one card with
-  // everything - one row per raw record showed the same Consumer Id/Name/
-  // Address repeated across rows with the agency columns blank, then a
-  // separate row with only agency columns filled. Merged into a single
-  // field map across every record in the response first, so the columns
-  // that came from a different card still land in the same row as the
-  // rest of that person's data - one result row per search, not one per
-  // fragment.
-  const merged = new Map();
+// locateme.services splits ONE person's data across several separate
+// cards (confirmed live 2026-08-23: a single search came back as 5
+// records - Consumer Detail fields in one, Agency Detail fields in
+// another, empty placeholders in the rest) rather than one card with
+// everything - merges every record's fields into one flat list first, so
+// columns that came from a different card still end up in the same row
+// as the rest of that person's data.
+function mergeIndaneGasFields(records) {
+  const merged = [];
   records.forEach(record => {
     (record.fields || []).forEach(f => {
-      const label = (f.label || "").trim().toLowerCase();
+      const label = (f.label || "").trim();
       const value = (f.value || "").trim();
-      if (value && !merged.get(label)) merged.set(label, value);
+      if (value && !merged.some(m => m.label.toLowerCase() === label.toLowerCase())) {
+        merged.push({ label, value });
+      }
     });
   });
-  const row = IG_COLUMNS.map(col => merged.get(col.toLowerCase()) || "—");
+  return merged;
+}
+
+// Substring match, not exact - confirmed live 2026-08-23: the real field
+// is labelled "UCM RELATIONSHIP ID" on the source site, not "RELATIONSHIP
+// ID" as it reads once summarized/typed out, so an exact-equality lookup
+// silently missed it (showed "—" despite the value being right there in
+// the response). Matching on "does this label CONTAIN the column name"
+// finds it regardless of whatever prefix the site puts in front.
+function lookupIndaneGasField(merged, col) {
+  const target = col.toLowerCase();
+  const hit = merged.find(m => m.label.toLowerCase().includes(target));
+  return hit ? hit.value : "—";
+}
+
+function buildIndaneGasTable(records) {
+  const merged = mergeIndaneGasFields(records);
+  const row = IG_COLUMNS.map(col => lookupIndaneGasField(merged, col));
 
   // Same weighted colgroup sizing as pan_india.php's buildResultsTable()
   // (reusing its .pan-results-table class, which is what actually turns on
@@ -388,15 +403,13 @@ exportBtn.addEventListener("click", () => {
 
   const aoa = [columns];
   groups.forEach((groupRecords, section) => {
-    const merged = new Map();
-    groupRecords.forEach(r => (r.fields || []).forEach(f => {
-      const label = (f.label || "").trim().toLowerCase();
-      const value = (f.value || "").trim();
-      if (value && !merged.get(label)) merged.set(label, value);
-    }));
+    const merged = mergeIndaneGasFields(groupRecords);
     const row = [];
     if (hasSection) row.push(section);
-    IG_COLUMNS.forEach(col => row.push(merged.get(col.toLowerCase()) || ""));
+    IG_COLUMNS.forEach(col => {
+      const value = lookupIndaneGasField(merged, col);
+      row.push(value === "—" ? "" : value);
+    });
     aoa.push(row);
   });
 
