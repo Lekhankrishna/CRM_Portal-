@@ -343,6 +343,17 @@ try {
                 $deadline = microtime(true) + 40;
                 $results = [];
                 $seen = [];
+                // True once at least one poll actually got a response from
+                // Telegram (2026-08-23) - confirmed live during a DC5 slow
+                // patch that EVERY poll in the loop can time out at the 15s
+                // cap, all the way to $deadline, without the bot's reply
+                // ever having been checked for at all. Before this flag,
+                // that indistinguishably fell through to the same
+                // 'ok:true, results:[]' response as a genuine "not in the
+                // database" - actively misleading, since an agent sees "No
+                // matching records found" for a number that may well exist,
+                // with no sign the search never actually completed.
+                $anyPollSucceeded = false;
                 // Polling messages.getHistory this often used to trip Telegram's
                 // own flood control - confirmed 2026-07-30 in
                 // telegram-worker-output.log ("Flood, waiting 11 seconds before
@@ -368,6 +379,7 @@ try {
                         usleep(800000);
                         continue;
                     }
+                    $anyPollSucceeded = true;
                     foreach ($history['messages'] ?? [] as $message) {
                         $id = (int) ($message['id'] ?? 0);
                         // Advances $lastMessageId for every message actually
@@ -394,6 +406,16 @@ try {
                     if ($results) break;
                     usleep(800000);
                 } while (microtime(true) < $deadline);
+
+                // Every poll attempt timed out - the reply was never actually
+                // checked for, so "no results" would be a lie, not a real
+                // answer. Distinct error (not just falling through to
+                // ok:true/results:[]) so the UI shows "search failed, try
+                // again" instead of "no matching records found", which for a
+                // real, existing number is actively wrong.
+                if (!$results && !$anyPollSucceeded) {
+                    throw new RuntimeException('Could not check for a reply - every poll attempt timed out.');
+                }
 
                 usort($results, fn(array $a, array $b): int => $a['id'] <=> $b['id']);
                 $response = ['ok' => true, 'results' => $results];
