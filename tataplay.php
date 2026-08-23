@@ -215,19 +215,7 @@ function buildAccountCard(account, heading) {
     ["Pin Code", account.pinCode],
   ]));
 
-  const digicardHeading = account.digicardNumber
-    ? `Digicard (${account.digicardNumber})`
-    : "Digicard";
-  box.appendChild(buildSubsectionHeading(digicardHeading));
   box.appendChild(buildFieldTable([
-    ["Product", account.digicardProduct],
-    ["Digicard #", account.digicardNumber],
-    ["Digicomp #", account.digicompNumber],
-    ["Digicard Type", account.digicardType],
-    ["Digicard Status", account.digicardStatus],
-    ["Effective Start Date", account.digicardEffectiveStartDate],
-    ["DigiComp Mfg. Serial Number", account.digicompSerialNumber],
-    ["Asset Type", account.assetType],
     ["Last Recharge Date", account.lastRechargeDate],
   ]));
 
