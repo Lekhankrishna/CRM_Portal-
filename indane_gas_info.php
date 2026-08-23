@@ -260,19 +260,6 @@ const IG_COLUMNS = [
 ];
 
 function buildIndaneGasTable(records) {
-  const table = document.createElement("table");
-  table.className = "results-table";
-
-  const thead = document.createElement("thead");
-  const headRow = document.createElement("tr");
-  IG_COLUMNS.forEach(col => {
-    const th = document.createElement("th");
-    th.textContent = col;
-    headRow.appendChild(th);
-  });
-  thead.appendChild(headRow);
-  table.appendChild(thead);
-
   // locateme.services splits ONE person's data across several separate
   // cards (confirmed live 2026-08-23: a single search came back as 5
   // records - Consumer Detail fields in one, Agency Detail fields in
@@ -292,12 +279,54 @@ function buildIndaneGasTable(records) {
       if (value && !merged.get(label)) merged.set(label, value);
     });
   });
+  const row = IG_COLUMNS.map(col => merged.get(col.toLowerCase()) || "—");
+
+  // Same weighted colgroup sizing as pan_india.php's buildResultsTable()
+  // (reusing its .pan-results-table class, which is what actually turns on
+  // table-layout:fixed + cell wrapping instead of the base .results-table's
+  // nowrap/ellipsis) - percentage widths driven by each column's own
+  // content length, capped so one very long field (an address) can't
+  // squeeze the rest down to nothing, so all 10 columns fit the page width
+  // with long values wrapping onto multiple lines instead of forcing a
+  // horizontal scroll.
+  const longestToken = value => value.split(/[\s,;]+/).reduce((max, tok) => Math.max(max, tok.length), 0);
+  const rawWeights = IG_COLUMNS.map((col, i) => {
+    const v = row[i] === "—" ? "" : row[i];
+    const maxLen = Math.max(col.length, v.length);
+    const maxToken = Math.max(col.length, longestToken(v));
+    return Math.max(Math.sqrt(maxLen) * 5, col.length * 1.5, maxToken * 3.2, 16);
+  });
+  const rawTotal = rawWeights.reduce((a, b) => a + b, 0);
+  const cap = rawTotal * 0.22;
+  const weights = rawWeights.map(w => Math.min(w, cap));
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+
+  const table = document.createElement("table");
+  table.className = "results-table pan-results-table";
+
+  const colgroup = document.createElement("colgroup");
+  weights.forEach(w => {
+    const col = document.createElement("col");
+    col.style.width = (w / totalWeight * 100).toFixed(2) + "%";
+    colgroup.appendChild(col);
+  });
+  table.appendChild(colgroup);
+
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  IG_COLUMNS.forEach(col => {
+    const th = document.createElement("th");
+    th.textContent = col;
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
   const tr = document.createElement("tr");
-  IG_COLUMNS.forEach(col => {
+  row.forEach(value => {
     const td = document.createElement("td");
-    td.textContent = merged.get(col.toLowerCase()) || "—";
+    td.textContent = value;
     tr.appendChild(td);
   });
   tbody.appendChild(tr);
