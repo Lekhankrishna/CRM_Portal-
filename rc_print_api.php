@@ -11,6 +11,7 @@ require __DIR__ . '/includes/auth.php';
 requireRcPrintAccess();
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/includes/rcprint_archive.php';
+require_once __DIR__ . '/includes/search_cache.php';
 
 header('Content-Type: application/json');
 
@@ -28,6 +29,37 @@ $vehicleNumber = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $data['vehicleNum
 if ($vehicleNumber === '' || strlen($vehicleNumber) < 4 || strlen($vehicleNumber) > 15) {
     http_response_code(400);
     echo json_encode(['error' => 'Enter a valid vehicle registration number.']);
+    exit;
+}
+
+// Read-through cache (2026-08-27) - checked BEFORE the credit-limit check
+// below, since a cache hit spends no locateme.services credits at all and
+// must never count against the monthly limit. Cached forever - see
+// includes/search_cache.php's own header comment for the reasoning. Note
+// this changes archiveRcPrintResult()'s original "no dedup, every search is
+// a fresh snapshot" behavior for repeat searches specifically - a cache hit
+// replays the same PDF instead of generating a new one, a deliberate
+// trade-off of the same "cache forever" choice applied to every tool here.
+// used/limit are left out of the cached payload and recomputed fresh below
+// on every response so they never go stale.
+$cacheKey = searchCacheKey($vehicleNumber);
+$cached = searchCacheGet($pdo, 'search_cache_rc_print', $cacheKey);
+if ($cached !== null) {
+    if (($_SESSION['role'] ?? '') !== 'admin') {
+        try {
+            $stmt = $pdo->prepare('SELECT rc_print_monthly_limit FROM users WHERE id = :id');
+            $stmt->execute(['id' => $_SESSION['user_id']]);
+            $cached['limit'] = (int) $stmt->fetchColumn();
+
+            $stmt = $pdo->prepare(
+                "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'rc_print' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+            );
+            $stmt->execute(['id' => $_SESSION['user_id']]);
+            $cached['used'] = (int) $stmt->fetchColumn();
+        } catch (PDOException $e) {}
+    }
+    http_response_code(200);
+    echo json_encode($cached);
     exit;
 }
 
@@ -112,6 +144,10 @@ if ($httpCode === 200 && is_array($decoded) && !empty($decoded['pdfDataUri'])) {
     } catch (PDOException $e) {}
 
     archiveRcPrintResult($decoded['pdfDataUri'], $vehicleNumber, currentUser()['username'] ?? 'unknown');
+
+    $toCache = $decoded;
+    unset($toCache['used'], $toCache['limit']);
+    searchCacheStore($pdo, 'search_cache_rc_print', $cacheKey, $vehicleNumber, $toCache, currentUser()['username'] ?? 'unknown');
 }
 
 http_response_code($httpCode ?: 200);

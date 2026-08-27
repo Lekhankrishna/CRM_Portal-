@@ -10,6 +10,7 @@ requireEagleEyeAccess();
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/includes/eagleeye_client.php';
 require_once __DIR__ . '/includes/eagleeye_archive.php';
+require_once __DIR__ . '/includes/search_cache.php';
 
 header('Content-Type: application/json');
 
@@ -32,6 +33,17 @@ $params = [
 if (!array_filter($params, fn($v) => $v !== '')) {
     http_response_code(400);
     echo json_encode(['error' => 'Enter at least one search field.']);
+    exit;
+}
+
+// Read-through cache (2026-08-27) - a repeat of the exact same field
+// combination is served instantly from our own database instead of going
+// through theeagleeye.biz again. Cached forever - see
+// includes/search_cache.php's own header comment for the reasoning.
+$cacheKey = searchCacheKey(...array_values($params));
+$cached = searchCacheGet($pdo, 'search_cache_advance_pan_india', $cacheKey);
+if ($cached !== null) {
+    echo json_encode($cached);
     exit;
 }
 
@@ -68,5 +80,7 @@ try {
 
     archiveEagleEyeResults($result['tables'] ?? [], currentUser()['username'] ?? 'unknown', $queryText);
 } catch (PDOException $e) {}
+
+searchCacheStore($pdo, 'search_cache_advance_pan_india', $cacheKey, $queryText, $result, currentUser()['username'] ?? 'unknown');
 
 echo json_encode($result);

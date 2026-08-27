@@ -8,6 +8,7 @@ requireAdvancedSearchAccess();
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/includes/tracekart_client.php';
 require_once __DIR__ . '/includes/tracekart_archive.php';
+require_once __DIR__ . '/includes/search_cache.php';
 
 header('Content-Type: application/json');
 
@@ -31,6 +32,21 @@ if (!isset(TRACEKART_STATES[$state]['modes'][$mode])) {
     exit;
 }
 $fields = is_array($data['fields'] ?? null) ? $data['fields'] : [];
+
+// Read-through cache (2026-08-27) - a repeat of the exact same
+// state+mode+fields is served instantly from our own database instead of
+// going through tracekart.in again. Cached forever - see
+// includes/search_cache.php's own header comment for the reasoning. Fields
+// are sorted by key before hashing so the same search submitted with keys
+// in a different order still hits the same cache entry.
+$fieldsForKey = $fields;
+ksort($fieldsForKey);
+$cacheKey = searchCacheKey($state, $mode, json_encode($fieldsForKey));
+$cached = searchCacheGet($pdo, 'search_cache_advanced_search', $cacheKey);
+if ($cached !== null) {
+    echo json_encode($cached);
+    exit;
+}
 
 // No monthly cap (removed 2026-08-12, per explicit instruction) - every
 // agent with access gets unlimited Advanced Search searches. Still logged
@@ -65,5 +81,7 @@ try {
 
     archiveTracekartResults($result['headers'] ?? [], $result['rows'] ?? [], currentUser()['username'] ?? 'unknown', $mode, $queryText);
 } catch (PDOException $e) {}
+
+searchCacheStore($pdo, 'search_cache_advanced_search', $cacheKey, $queryText, $result, currentUser()['username'] ?? 'unknown');
 
 echo json_encode($result);

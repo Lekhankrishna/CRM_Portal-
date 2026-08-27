@@ -8,6 +8,7 @@ require __DIR__ . '/includes/auth.php';
 requireTataPlayAccess();
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/includes/tataplay_archive.php';
+require_once __DIR__ . '/includes/search_cache.php';
 
 header('Content-Type: application/json');
 
@@ -25,6 +26,18 @@ $mobileNumber = preg_replace('/\D/', '', $data['mobileNumber'] ?? '');
 if (strlen($mobileNumber) !== 10) {
     http_response_code(400);
     echo json_encode(['error' => 'Enter a valid 10-digit mobile number.']);
+    exit;
+}
+
+// Read-through cache (2026-08-27) - a repeat search for the same number is
+// served instantly from our own database instead of going through the SSO
+// login + Siebel PRM quick-find again. Cached forever - see
+// includes/search_cache.php's own header comment for the reasoning.
+$cacheKey = searchCacheKey($mobileNumber);
+$cached = searchCacheGet($pdo, 'search_cache_tata_play', $cacheKey);
+if ($cached !== null) {
+    http_response_code(200);
+    echo json_encode($cached);
     exit;
 }
 
@@ -97,6 +110,8 @@ if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decode
             $mobileNumber
         );
     }
+
+    searchCacheStore($pdo, 'search_cache_tata_play', $cacheKey, $mobileNumber, $decoded, currentUser()['username'] ?? 'unknown');
 }
 
 http_response_code($httpCode ?: 200);

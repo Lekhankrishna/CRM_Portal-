@@ -8,6 +8,7 @@ require __DIR__ . '/includes/auth.php';
 requireHpGasAccess();
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/includes/hpgas_archive.php';
+require_once __DIR__ . '/includes/search_cache.php';
 
 header('Content-Type: application/json');
 
@@ -25,6 +26,34 @@ $mobileNumber = preg_replace('/\D/', '', $data['mobileNumber'] ?? '');
 if (strlen($mobileNumber) !== 10) {
     http_response_code(400);
     echo json_encode(['error' => 'Enter a valid 10-digit mobile number.']);
+    exit;
+}
+
+// Read-through cache (2026-08-27) - checked BEFORE the credit-limit check
+// below, since a cache hit spends no locateme.services credits at all and
+// must never count against the monthly limit. Cached forever - see
+// includes/search_cache.php's own header comment for the reasoning. The
+// used/limit fields are deliberately left out of the cached payload and
+// recomputed fresh below on every response (cached or live) so they never
+// go stale.
+$cacheKey = searchCacheKey($mobileNumber);
+$cached = searchCacheGet($pdo, 'search_cache_hp_gas', $cacheKey);
+if ($cached !== null) {
+    if (($_SESSION['role'] ?? '') !== 'admin') {
+        try {
+            $stmt = $pdo->prepare('SELECT hp_gas_monthly_limit FROM users WHERE id = :id');
+            $stmt->execute(['id' => $_SESSION['user_id']]);
+            $cached['limit'] = (int) $stmt->fetchColumn();
+
+            $stmt = $pdo->prepare(
+                "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'hp_gas' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+            );
+            $stmt->execute(['id' => $_SESSION['user_id']]);
+            $cached['used'] = (int) $stmt->fetchColumn();
+        } catch (PDOException $e) {}
+    }
+    http_response_code(200);
+    echo json_encode($cached);
     exit;
 }
 
@@ -110,6 +139,10 @@ if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decode
     if (!empty($decoded['found']) && !empty($decoded['sections'])) {
         archiveHpGasResults($decoded['sections'], currentUser()['username'] ?? 'unknown', $mobileNumber);
     }
+
+    $toCache = $decoded;
+    unset($toCache['used'], $toCache['limit']);
+    searchCacheStore($pdo, 'search_cache_hp_gas', $cacheKey, $mobileNumber, $toCache, currentUser()['username'] ?? 'unknown');
 }
 
 http_response_code($httpCode ?: 200);
