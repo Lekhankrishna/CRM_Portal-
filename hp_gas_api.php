@@ -46,7 +46,7 @@ if ($cached !== null) {
             $cached['limit'] = (int) $stmt->fetchColumn();
 
             $stmt = $pdo->prepare(
-                "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'hp_gas' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+                "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'hp_gas' AND result_count > 0 AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
             );
             $stmt->execute(['id' => $_SESSION['user_id']]);
             $cached['used'] = (int) $stmt->fetchColumn();
@@ -67,7 +67,7 @@ if (($_SESSION['role'] ?? '') !== 'admin') {
     $limit = (int) $stmt->fetchColumn();
 
     $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'hp_gas' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+        "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'hp_gas' AND result_count > 0 AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
     );
     $stmt->execute(['id' => $_SESSION['user_id']]);
     $usedThisMonth = (int) $stmt->fetchColumn();
@@ -102,11 +102,15 @@ if ($response === false) {
     exit;
 }
 
-// Only a genuinely completed lookup counts against the monthly limit and
-// shows up in Admin > Audit Log - a failed login, timeout, or unreachable
-// service isn't the agent's fault. "found": false (a clean not-found result)
-// still counts as a completed search - it's the same as RC Print charging
-// per attempt regardless of hit/miss (both spend locateme.services credits).
+// Every completed attempt is still logged for Admin > Audit Log
+// visibility (a failed login/timeout/unreachable-service attempt isn't
+// logged at all, same as before) - but only a genuine "found": true result
+// counts against the monthly limit (2026-08-28, per explicit instruction:
+// a clean not-found result must not cost the agent quota just because the
+// agent never actually got anything back). result_count is 0 on a
+// not-found row, which is exactly what the quota queries above/below
+// filter on via "AND result_count > 0" - nothing here needs to change,
+// only what counts as "used" downstream.
 $decoded = json_decode($response, true);
 if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decoded)) {
     try {
@@ -127,7 +131,7 @@ if ($httpCode === 200 && is_array($decoded) && array_key_exists('found', $decode
             $decoded['limit'] = (int) $stmt->fetchColumn();
 
             $stmt = $pdo->prepare(
-                "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'hp_gas' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+                "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'hp_gas' AND result_count > 0 AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
             );
             $stmt->execute(['id' => $_SESSION['user_id']]);
             $decoded['used'] = (int) $stmt->fetchColumn();

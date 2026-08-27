@@ -13,8 +13,12 @@ if (!$isAdmin) {
     $stmt->execute(['id' => $_SESSION['user_id']]);
     $monthlyLimit = (int) $stmt->fetchColumn();
 
+    // result_count > 0 (2026-08-28) - matches tracing2_api.php's own quota
+    // query for this same search_type: a clean not-found result doesn't
+    // cost the agent quota, so this badge must count the same rows the
+    // live gate actually enforces against, not every logged attempt.
     $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'indane_gas' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+        "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'indane_gas' AND result_count > 0 AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
     );
     $stmt->execute(['id' => $_SESSION['user_id']]);
     $usedThisMonth = (int) $stmt->fetchColumn();

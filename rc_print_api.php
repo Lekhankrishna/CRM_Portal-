@@ -52,7 +52,7 @@ if ($cached !== null) {
             $cached['limit'] = (int) $stmt->fetchColumn();
 
             $stmt = $pdo->prepare(
-                "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'rc_print' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+                "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'rc_print' AND result_count > 0 AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
             );
             $stmt->execute(['id' => $_SESSION['user_id']]);
             $cached['used'] = (int) $stmt->fetchColumn();
@@ -76,7 +76,7 @@ if (($_SESSION['role'] ?? '') !== 'admin') {
     $limit = (int) $stmt->fetchColumn();
 
     $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'rc_print' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+        "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'rc_print' AND result_count > 0 AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
     );
     $stmt->execute(['id' => $_SESSION['user_id']]);
     $usedThisMonth = (int) $stmt->fetchColumn();
@@ -134,7 +134,7 @@ if ($httpCode === 200 && is_array($decoded) && !empty($decoded['pdfDataUri'])) {
             $decoded['limit'] = (int) $stmt->fetchColumn();
 
             $stmt = $pdo->prepare(
-                "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'rc_print' AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+                "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'rc_print' AND result_count > 0 AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
             );
             $stmt->execute(['id' => $_SESSION['user_id']]);
             $decoded['used'] = (int) $stmt->fetchColumn();

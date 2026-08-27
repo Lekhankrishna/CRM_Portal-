@@ -123,9 +123,15 @@ switch ($requiresAccess) {
 // credit-limit gate that used to be the first thing computing these.
 $quotaIsCredits = ($requiresAccess === null);
 $quotaUnit      = $quotaIsCredits ? 'credits' : 'searches';
+// "AND result_count > 0" (2026-08-28, per explicit instruction) - a clean
+// not-found result must not cost the agent quota just because the agent
+// never actually got anything back. result_count is already 0 on every
+// not-found row for every branch that logs here (rc-print, hp-gas-advanced,
+// indane_gas, and the generic credits-based tools below), so this one
+// filter is enough for both the count-based and credits-based quota style.
 $quotaSql = $quotaIsCredits
-    ? "SELECT COALESCE(SUM(credits_spent), 0) FROM search_logs WHERE user_id = :id AND search_type = :type AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
-    : "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = :type AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')";
+    ? "SELECT COALESCE(SUM(credits_spent), 0) FROM search_logs WHERE user_id = :id AND search_type = :type AND result_count > 0 AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+    : "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = :type AND result_count > 0 AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')";
 
 // Read-through cache (2026-08-27) - checked before the credit-limit gate
 // below, since a cache hit spends no locateme.services credits at all and
