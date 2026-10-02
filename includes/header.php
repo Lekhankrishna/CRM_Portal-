@@ -1,4 +1,18 @@
 <?php
+// No caching for any authenticated page - confirmed live 2026-09-06: an
+// agent kept seeing indane_gas_pro.php's OLD inline JS (a stale
+// ESTIMATED_SECONDS progress-bar estimate) well after the file on disk and
+// every direct localhost request had already picked up the fix, accessed
+// via the public datasearch.in URL rather than 127.0.0.1 directly - this
+// page never sent any cache directives at all, so a browser (or anything
+// between it and this server on that public path) was free to cache the
+// whole HTML+inline-script response under its own heuristics and keep
+// replaying it past a normal refresh. Every dynamic, per-request page here
+// goes through this one shared header, so setting it once here rules this
+// out everywhere instead of one page at a time.
+header('Cache-Control: no-store, no-cache, must-revalidate');
+header('Pragma: no-cache');
+
 $user = currentUser();
 $bp = $basePath ?? '';
 $currentPage = basename($_SERVER['SCRIPT_NAME']);
@@ -120,6 +134,13 @@ if (hasHpGasAccess()) {
 if (hasIndaneGasAccess()) {
     $searchRegionsExtra[] = ['label' => 'Indane Gas', 'href' => 'indane_gas_info.php'];
 }
+// Indane Gas Pro (app.cyfuture.co.in "LPG Emergency Helpline") - a separate
+// integration from Indane Gas above, placed directly below it per explicit
+// instruction. Own access flag + count-based monthly quota
+// (indane_gas_pro_access), same pattern as Indane Gas itself.
+if (hasIndaneGasProAccess()) {
+    $searchRegionsExtra[] = ['label' => 'Indane Gas Pro', 'href' => 'indane_gas_pro.php'];
+}
 // Tata Play is opt-in per account (Admin > Agents > "Tata Play Access") -
 // same pattern as HP LPG Search above (own tataplay.py Selenium automation
 // against the distributor's mysso.tataplay.com SSO login, proxied through
@@ -127,6 +148,13 @@ if (hasIndaneGasAccess()) {
 // instruction.
 if (hasTataPlayAccess()) {
     $searchRegionsExtra[] = ['label' => 'TATA SKY DTH', 'href' => 'tataplay.php'];
+}
+// Aadhaar to Ration Finder (locateme.services) - own dedicated access flag +
+// count-based monthly quota, same pattern as RC Print/HP Gas Advanced
+// (own aadhaar_to_ration.py Selenium automation, reusing rc_print.py's
+// locateme.services login, proxied through aadhaar_to_ration_api.php).
+if (hasAadhaarToRationAccess()) {
+    $searchRegionsExtra[] = ['label' => 'Aadhaar to Family Members', 'href' => 'aadhaar_to_ration.php'];
 }
 $selectedState = $_GET['state'] ?? '';
 
@@ -219,15 +247,26 @@ $expiresLabel = $expiresAt ? date('d-F-Y', strtotime($expiresAt)) : null;
 
     <div class="sidebar__section-label">Account</div>
     <nav class="sidebar__group">
-      <?php if ($user['role'] === 'admin'):
+      <a href="#" class="sidebar__item sidebar__item--dark" onclick="openChangePasswordModal(); return false;">
+        <span class="sidebar__icon" style="color:#1f2937"><i class="bi bi-lock-fill"></i></span> Change Password
+      </a>
+      <?php if (in_array($user['role'], ['admin', 'sub_admin'], true)):
+        // sub_admin only gets "Agents" (where its own create/edit caps are
+        // enforced server-side - see admin/agents.php) - every other admin
+        // page here stays real-admin-only, added conditionally below
+        // rather than folded into one array shared by both roles.
         $adminNavItems = [
-          ['page' => 'agents.php',             'href' => 'admin/agents.php',             'icon' => 'bi-people-fill',       'label' => 'Agents'],
-          ['page' => 'logs.php',               'href' => 'admin/logs.php',               'icon' => 'bi-journal-text',      'label' => 'Audit Log'],
-          ['page' => 'import.php',             'href' => 'admin/import.php',             'icon' => 'bi-cloud-upload-fill', 'label' => 'Import'],
-          ['page' => 'ecommerce_import.php',   'href' => 'admin/ecommerce_import.php',   'icon' => 'bi-cart-fill',         'label' => 'E-Comm Import'],
-          ['page' => 'lpg_settings.php',       'href' => 'admin/lpg_settings.php',       'icon' => 'bi-key-fill',          'label' => 'LPG Settings'],
-          ['page' => 'whatsapp_settings.php',  'href' => 'admin/whatsapp_settings.php',  'icon' => 'bi-whatsapp',          'label' => 'WhatsApp Settings'],
+          ['page' => 'agents.php', 'href' => 'admin/agents.php', 'icon' => 'bi-people-fill', 'label' => 'Agents'],
         ];
+        if ($user['role'] === 'admin') {
+          $adminNavItems = array_merge($adminNavItems, [
+            ['page' => 'logs.php',               'href' => 'admin/logs.php',               'icon' => 'bi-journal-text',      'label' => 'Audit Log'],
+            ['page' => 'import.php',             'href' => 'admin/import.php',             'icon' => 'bi-cloud-upload-fill', 'label' => 'Import'],
+            ['page' => 'ecommerce_import.php',   'href' => 'admin/ecommerce_import.php',   'icon' => 'bi-cart-fill',         'label' => 'E-Comm Import'],
+            ['page' => 'lpg_settings.php',       'href' => 'admin/lpg_settings.php',       'icon' => 'bi-key-fill',          'label' => 'LPG Settings'],
+            ['page' => 'whatsapp_settings.php',  'href' => 'admin/whatsapp_settings.php',  'icon' => 'bi-whatsapp',          'label' => 'WhatsApp Settings'],
+          ]);
+        }
         foreach ($adminNavItems as $item):
           $isActive = $currentPage === $item['page'];
           $thisColorIndex = $navColorIndex++;
@@ -265,7 +304,7 @@ $expiresLabel = $expiresAt ? date('d-F-Y', strtotime($expiresAt)) : null;
         <i class="bi bi-calendar3"></i>
         <?= $expiresLabel ? 'Expires: ' . htmlspecialchars($expiresLabel) : 'No expiry' ?>
       </div>
-      <span class="topbar__role topbar__role--<?= $user['role'] ?>"><?= ucfirst($user['role']) ?></span>
+      <span class="topbar__role topbar__role--<?= $user['role'] ?>"><?= $user['role'] === 'sub_admin' ? 'Sub Admin' : ucfirst($user['role']) ?></span>
       <a href="<?= $bp ?>logout.php" class="app-topbar__logout">
         <i class="bi bi-box-arrow-right"></i> Logout
       </a>
