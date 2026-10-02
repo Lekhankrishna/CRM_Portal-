@@ -29,38 +29,14 @@ if (strlen($mobileNumber) !== 10) {
     exit;
 }
 
-// Read-through cache (2026-08-27) - checked BEFORE the credit-limit check
-// below, since a cache hit spends no locateme.services credits at all and
-// must never count against the monthly limit. Cached forever - see
-// includes/search_cache.php's own header comment for the reasoning. The
-// used/limit fields are deliberately left out of the cached payload and
-// recomputed fresh below on every response (cached or live) so they never
-// go stale.
-$cacheKey = searchCacheKey($mobileNumber);
-$cached = searchCacheGet($pdo, 'search_cache_hp_gas', $cacheKey);
-if ($cached !== null) {
-    if (($_SESSION['role'] ?? '') !== 'admin') {
-        try {
-            $stmt = $pdo->prepare('SELECT hp_gas_monthly_limit FROM users WHERE id = :id');
-            $stmt->execute(['id' => $_SESSION['user_id']]);
-            $cached['limit'] = (int) $stmt->fetchColumn();
-
-            $stmt = $pdo->prepare(
-                "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'hp_gas' AND result_count > 0 AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
-            );
-            $stmt->execute(['id' => $_SESSION['user_id']]);
-            $cached['used'] = (int) $stmt->fetchColumn();
-        } catch (PDOException $e) {}
-    }
-    http_response_code(200);
-    echo json_encode($cached);
-    exit;
-}
-
 // Each search spends real credits (150/search) on the single shared
 // locateme.services account, so every agent is capped per calendar month
 // (Admin > Agents > "HP Gas Monthly Limit") - same reasoning and query
 // shape as rc_print_api.php's limit check. Admins bypass this entirely.
+// Checked BEFORE the cache lookup below (2026-10-02, per explicit
+// instruction: a cached result is still a result handed to the agent, so it
+// must still be blocked once their quota is exhausted, exactly like a live
+// fetch - a cache hit is no longer a free pass around the monthly limit).
 if (($_SESSION['role'] ?? '') !== 'admin') {
     $stmt = $pdo->prepare('SELECT hp_gas_monthly_limit FROM users WHERE id = :id');
     $stmt->execute(['id' => $_SESSION['user_id']]);
@@ -81,6 +57,47 @@ if (($_SESSION['role'] ?? '') !== 'admin') {
         ]);
         exit;
     }
+}
+
+// Read-through cache (2026-08-27). Cached forever - see
+// includes/search_cache.php's own header comment for the reasoning. The
+// used/limit fields are deliberately left out of the cached payload and
+// recomputed fresh below on every response (cached or live) so they never
+// go stale. A hit still logs to search_logs and counts against the
+// monthly limit below, same as a live fetch (2026-10-02 - see comment
+// above the limit check).
+$cacheKey = searchCacheKey($mobileNumber);
+$cached = searchCacheGet($pdo, 'search_cache_hp_gas', $cacheKey);
+if ($cached !== null) {
+    try {
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
+        $pdo->prepare(
+            "INSERT INTO search_logs (user_id, search_type, search_query, result_count, ip_address)
+             VALUES (:uid, 'hp_gas', :q, :cnt, :ip)"
+        )->execute([
+            'uid' => $_SESSION['user_id'],
+            'q' => $mobileNumber,
+            'cnt' => !empty($cached['found']) ? 1 : 0,
+            'ip' => substr($ip, 0, 45),
+        ]);
+    } catch (PDOException $e) {}
+
+    if (($_SESSION['role'] ?? '') !== 'admin') {
+        try {
+            $stmt = $pdo->prepare('SELECT hp_gas_monthly_limit FROM users WHERE id = :id');
+            $stmt->execute(['id' => $_SESSION['user_id']]);
+            $cached['limit'] = (int) $stmt->fetchColumn();
+
+            $stmt = $pdo->prepare(
+                "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'hp_gas' AND result_count > 0 AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+            );
+            $stmt->execute(['id' => $_SESSION['user_id']]);
+            $cached['used'] = (int) $stmt->fetchColumn();
+        } catch (PDOException $e) {}
+    }
+    http_response_code(200);
+    echo json_encode($cached);
+    exit;
 }
 
 $ch = curl_init(FLASK_BASE . '/api/hp-gas');
