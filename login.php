@@ -20,6 +20,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($user && password_verify($password, $user['password_hash'])) {
         if ($user['expires_at'] !== null && strtotime($user['expires_at']) <= time()) {
             $error = 'This account has expired. Please contact an administrator.';
+        } elseif (!isIpAllowed($user['allowed_ips'], clientIp())) {
+            $error = 'This account cannot sign in from this network. Contact your administrator.';
         } else {
             // Each account gets up to max_concurrent_sessions active device
             // slots (Admin > Agents > "Max Simultaneous Logins", default 1 -
@@ -64,6 +66,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if ($error === '' && ($_GET['reason'] ?? '') === 'session_replaced') {
     $error = 'You have been signed out because this account was signed in from another device.';
 }
+if ($error === '' && ($_GET['reason'] ?? '') === 'ip_restricted') {
+    $error = 'You have been signed out because this account cannot be used from this network.';
+}
+
+$notice = '';
+if ($error === '' && ($_GET['reason'] ?? '') === 'password_changed') {
+    $notice = 'Your password was changed. Please sign in again.';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -95,6 +105,11 @@ if ($error === '' && ($_GET['reason'] ?? '') === 'session_replaced') {
           <i class="bi bi-exclamation-triangle-fill"></i>
           <?= htmlspecialchars($error) ?>
         </div>
+      <?php elseif ($notice): ?>
+        <div class="login-notice">
+          <i class="bi bi-check-circle-fill"></i>
+          <?= htmlspecialchars($notice) ?>
+        </div>
       <?php endif; ?>
 
       <form method="post" autocomplete="on">
@@ -106,15 +121,9 @@ if ($error === '' && ($_GET['reason'] ?? '') === 'session_replaced') {
         </div>
         <div class="form-group">
           <label class="form-label" for="password">Password</label>
-          <div class="password-field-wrap">
-            <input id="password" class="form-control" type="password" name="password"
-                   required autocomplete="current-password"
-                   placeholder="Enter your password">
-            <button type="button" class="password-toggle-btn" id="password-toggle-btn"
-                    aria-label="Show password" aria-pressed="false">
-              <i class="bi bi-eye-fill" id="password-toggle-icon"></i>
-            </button>
-          </div>
+          <input id="password" class="form-control" type="password" name="password"
+                 required autocomplete="current-password"
+                 placeholder="Enter your password">
         </div>
         <button type="submit" class="btn btn-primary">
           <i class="bi bi-box-arrow-in-right"></i> Sign In
@@ -123,17 +132,5 @@ if ($error === '' && ($_GET['reason'] ?? '') === 'session_replaced') {
 
     </div>
   </div>
-  <script>
-    const pwInput = document.getElementById('password');
-    const pwBtn   = document.getElementById('password-toggle-btn');
-    const pwIcon  = document.getElementById('password-toggle-icon');
-    pwBtn.addEventListener('click', () => {
-      const showing = pwInput.type === 'text';
-      pwInput.type = showing ? 'password' : 'text';
-      pwIcon.className = showing ? 'bi bi-eye-fill' : 'bi bi-eye-slash-fill';
-      pwBtn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
-      pwBtn.setAttribute('aria-pressed', showing ? 'false' : 'true');
-    });
-  </script>
 </body>
 </html>

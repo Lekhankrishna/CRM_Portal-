@@ -274,8 +274,8 @@ require __DIR__ . '/includes/header.php';
       list.replaceChildren();
       if (!records.length) {
         count.textContent = '0 results';
-        const empty = document.createElement('div'); empty.className = 'pan-result-state';
-        empty.textContent = 'No matching records found.'; list.appendChild(empty);
+        const empty = document.createElement('div'); empty.className = 'pan-not-found';
+        empty.textContent = `Not found for ${value}.`; list.appendChild(empty);
       } else {
         const { table, rowCount } = buildResultsTable(records);
         count.textContent = rowCount + ' result' + (rowCount === 1 ? '' : 's');

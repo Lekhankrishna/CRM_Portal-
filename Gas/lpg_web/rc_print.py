@@ -1,7 +1,6 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.keys import Keys
 
 import time
 
@@ -10,7 +9,7 @@ import time
 # is a similar target (a login-gated site actively used by real staff, not a
 # throwaway scrape), so the same hardened driver setup is the safer default
 # here too rather than starting from a plain unconfigured Chrome instance.
-from lpg_search import _create_driver, _quit_driver_with_timeout
+from lpg_search import _create_driver, _quit_driver_with_timeout, _type_and_submit
 
 # =========================================================
 # LOGIN DETAILS - locateme.services (Firebase email/password login).
@@ -101,9 +100,7 @@ def run_rc_print(vehicle_number):
         number_input = wait.until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='ENTER VEHICLE NUMBER']"))
         )
-        number_input.clear()
-        number_input.send_keys(vehicle_number)
-        number_input.send_keys(Keys.RETURN)
+        _type_and_submit(number_input, vehicle_number)
 
         # PDF generation (their server action) isn't instant - poll for
         # either the result iframe or an error message rather than one long

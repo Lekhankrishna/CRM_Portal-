@@ -1,12 +1,11 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import StaleElementReferenceException
 
 import time
 
-from lpg_search import _create_driver, _quit_driver_with_timeout
+from lpg_search import _create_driver, _quit_driver_with_timeout, _type_and_submit
 from rc_print import _login, run_rc_print
 from hp_gas import run_hp_gas_single
 
@@ -107,6 +106,11 @@ FAILURE_NEEDLES = (
     # side, not extraction bugs - surfacing these as a clean "not found"
     # instead of a raw-text dump.
     "api error", "service error", "cooldown",
+    # Confirmed live 2026-09-04 (Aadhaar to Ration): a real upstream data-
+    # source failure, not this scraper mis-locating anything - the site's
+    # own message when its Aadhaar-linked-records backend itself is
+    # unreachable.
+    "connection to registry nodes failed", "please check your network",
 )
 
 
@@ -331,9 +335,7 @@ def run_tool_search(tool_slug, query):
         input_el = wait.until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "input:not([type='hidden'])"))
         )
-        input_el.clear()
-        input_el.send_keys(query)
-        input_el.send_keys(Keys.RETURN)
+        _type_and_submit(input_el, query)
 
         deadline = time.time() + 30
         while time.time() < deadline:

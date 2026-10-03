@@ -21,6 +21,19 @@ require $serviceDirectory . '/madeline.php';
     // MadelineProto may surface that normal cancellation through the Windows
     // event loop; ignore only this expected type and preserve real failures.
     if ($error instanceof \Amp\CancelledException) return;
+    // AUTH_TOKEN_EXPIRED added 2026-08-31: confirmed live - this exact
+    // condition (the login token's own ~30s lifetime lost the race against
+    // the scan/import cycle) can ALSO surface asynchronously here, from the
+    // event loop's own background retry of the pending
+    // auth.exportLoginToken/importLoginToken request (visible in the log as
+    // "WriteLoop: Still missing auth.importLoginToken... sending state
+    // request"), not just synchronously from
+    // waitForLoginOrQrCodeExpiration() - which already has its own catch,
+    // below. This async path bypassed that catch entirely and crashed the
+    // whole worker instead of just letting the still-running qrLogin loop
+    // continue on to its next attempt.
+    if ($error instanceof \danog\MadelineProto\RPCErrorException
+        && stripos($error->getMessage(), 'AUTH_TOKEN_EXPIRED') !== false) return;
     throw $error;
 });
 
@@ -207,9 +220,15 @@ try {
     // - construction itself was the one place a transient timeout during
     // MadelineProto's own internal post-login wakeup() check had zero retry
     // protection, and that's exactly what crashed the worker twice in a row.
+    // Raised 5 -> 10 (2026-08-31, per explicit instruction) - confirmed live
+    // that even 5 attempts weren't always enough during today's DC 5
+    // instability (multiple "Telegram is completing the login hand-off"
+    // cycles observed before the whole worker crashed with an uncaught
+    // "operation was cancelled"). This is a one-time startup cost, not
+    // something a user waits on per search, so being generous here is cheap.
     $api = telegramRetryAfterCancellation(
         fn() => new \danog\MadelineProto\API($serviceDirectory . '/worker.session', $settings),
-        5
+        10
     );
     echo PHP_EOL . "ONE-TIME TELEGRAM QR LOGIN" . PHP_EOL;
     echo "On the logged-in phone: Telegram > Settings > Devices > Link Desktop Device." . PHP_EOL;
@@ -287,9 +306,17 @@ try {
     // latency source and a real failure point from every search after the
     // first. Updated at the bottom of the search handler below as new
     // messages are observed, so it never goes stale.
+    // Attempts raised 2 -> 4 (2026-08-31, per explicit instruction) after a
+    // confirmed live outage: DC 5's connection was found repeatedly dying
+    // mid-call with danog\MadelineProto\NothingInTheSocketException (a hard
+    // reset, not just a slow reply as previously assumed) - a live test
+    // search hit this multiple times within a single 50s (2x25s) window and
+    // never completed. This is a one-time startup cost, so doubling it here
+    // is cheap insurance even though it isn't the call users actually wait
+    // on for each search.
     $lastMessageId = (int) (telegramCallWithRetry(
         fn() => $api->messages->getHistory(peer: $peer, limit: 1),
-        25, 2, 'the startup history check'
+        25, 4, 'the startup history check'
     )['messages'][0]['id'] ?? 0);
 
     $server = stream_socket_server('tcp://127.0.0.1:8091', $errorNumber, $errorMessage);
@@ -316,9 +343,25 @@ try {
                 // first fetched, above the server loop) replaces what used to
                 // be a fresh getHistory call here on every single search.
                 $beforeId = $lastMessageId;
+                // Attempts raised 2 -> 4 (2026-08-31) then 4 -> 6, and
+                // per-attempt timeout trimmed 25s -> 20s (2026-09-03, per
+                // explicit instruction) - confirmed live that even 4x25s
+                // wasn't always enough: the worker's own log showed a single
+                // search exhaust all 4 attempts back-to-back (four
+                // consecutive "Got exception in check loop for DC 5.0"
+                // entries) and fail outright, while dozens of other searches
+                // in the same short window succeeded fine - DC 5 is still
+                // unpredictably flaky, just not constantly so, and this is
+                // about buying more independent tries at catching it in a
+                // good moment rather than waiting longer on any one attempt
+                // (same reasoning as the original 2 -> 4 raise). Worst case
+                // here is 6x20s = 120s (was 100s); combined with the 40s poll
+                // loop below, that's ~160s + overhead, still comfortably
+                // under the client-side 190s ceiling
+                // (includes/telegram_worker_client.php).
                 telegramCallWithRetry(
                     fn() => $api->messages->sendMessage(peer: $peer, message: $query),
-                    25, 2, 'sending the search query'
+                    20, 6, 'sending the search query'
                 );
 
                 // Concurrent-user correctness check: this account is shared

@@ -112,3 +112,25 @@ CREATE TABLE IF NOT EXISTS `search_cache_tracing2` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_search_key` (`search_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `search_cache_indane_gas_pro` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `search_key` CHAR(32) NOT NULL,
+  `search_key_display` VARCHAR(255) NOT NULL,
+  `result_json` LONGTEXT NOT NULL,
+  `searched_by` VARCHAR(100) NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_search_key` (`search_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `search_cache_aadhaar_to_ration` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `search_key` CHAR(32) NOT NULL,
+  `search_key_display` VARCHAR(255) NOT NULL,
+  `result_json` LONGTEXT NOT NULL,
+  `searched_by` VARCHAR(100) NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_search_key` (`search_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
