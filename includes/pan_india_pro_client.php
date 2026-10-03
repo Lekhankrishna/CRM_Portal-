@@ -17,7 +17,7 @@
 // directly here and already committed to git history; moved out.
 require_once __DIR__ . '/../config/vendor_credentials.php';
 const PAN_INDIA_PRO_API_BASE = 'https://api.knotorious.us';
-const PAN_INDIA_PRO_FRONTEND = 'https://www.jobhuntworldknotorious.online';
+const PAN_INDIA_PRO_FRONTEND = 'https://www.knotoriousai.online';
 define('PAN_INDIA_PRO_EMAIL', $PAN_INDIA_PRO_EMAIL);
 define('PAN_INDIA_PRO_PASSWORD', $PAN_INDIA_PRO_PASSWORD);
 
