@@ -121,19 +121,43 @@ function tracekartLogin(): bool {
 // mobile search is "ChnMobileno" on Tamil Nadu's page but plain "mobile"
 // everywhere else). Field NAMES (searchMobile, cname, etc.) are the one
 // thing consistent across all 5 - see TRACEKART_MODE_FIELDS.
+// searchPath/columns updated 2026-10-05 - tracekart.in rebuilt every
+// state's search page around a JSON AJAX endpoint (DataTables-driven,
+// /js/region-search.js) instead of the old server-rendered HTML table -
+// confirmed live by re-fetching each state's own index page: every
+// search <form>'s actual action= attribute had moved to a consistent
+// "/<prefix>/SearchData" path (was 404ing under the old per-state paths
+// below, surfaced to agents as the generic "Server Down" error since
+// advanced_search_api.php collapses any Throwable from tracekartSearch()
+// to that one message), AND the response itself changed from an HTML
+// page with a #resultsContainer table to a plain
+// {"rows":[[...],...],"page":1,"batchSize":1000,"hasMore":false} JSON
+// body, each row a plain positional array (no field names) matching
+// 'columns' below 1:1 - lifted directly out of each page's own
+// `initRegionSearch({... columns: [...] })` call, which is also where
+// region-search.js's own column ORDER comes from (not hardcoded in any
+// column-name attribute on the response itself). That page's own code
+// comment notes the identity/proof column is only present for accounts
+// allowed to see it - these are the columns actually returned for the
+// account this integration uses, not a generic schema.
 const TRACEKART_STATES = [
-    'tn' => ['label' => 'Tamil Nadu',     'indexPath' => '/Home/Index',    'searchPath' => '/Home/Search',
-        'modes' => ['mobile' => 'ChnMobileno', 'father' => 'ChnFathername', 'dob' => 'ChnDOB', 'address' => 'nameandaddress', 'fulladdress' => 'fulladdress']],
-    'ap' => ['label' => 'Andhra Pradesh', 'indexPath' => '/HYD/Index',     'searchPath' => '/HYD/HYDSearch',
-        'modes' => ['mobile' => 'mobile', 'father' => 'ChnFathername', 'dob' => 'hydDOB', 'address' => 'nameandaddress', 'fulladdress' => 'fulladdress']],
-    'ka' => ['label' => 'Karnataka',      'indexPath' => '/BNG/Index',     'searchPath' => '/BNG/BNGSearch',
-        'modes' => ['mobile' => 'mobile', 'father' => 'nameandfathername', 'dob' => 'nameanddob', 'address' => 'nameandaddress', 'fulladdress' => 'fulladdress']],
-    'mh' => ['label' => 'Maharashtra',    'indexPath' => '/MUM/Index',     'searchPath' => '/Mum/MUMSearch',
-        'modes' => ['mobile' => 'mobile', 'father' => 'nameandfathername', 'dob' => 'nameanddob', 'address' => 'nameandaddress', 'fulladdress' => 'fulladdress']],
+    'tn' => ['label' => 'Tamil Nadu',     'indexPath' => '/Home/Index',    'searchPath' => '/Home/SearchData',
+        'modes' => ['mobile' => 'ChnMobileno', 'father' => 'ChnFathername', 'dob' => 'ChnDOB', 'address' => 'nameandaddress', 'fulladdress' => 'fulladdress'],
+        'columns' => ['Name', 'Mobile No', 'DOB', 'Gender', "Father's Name", 'Address', 'Permanent Address', 'Email', 'Alternative No', 'Identity']],
+    'ap' => ['label' => 'Andhra Pradesh', 'indexPath' => '/HYD/Index',     'searchPath' => '/HYD/SearchData',
+        'modes' => ['mobile' => 'mobile', 'father' => 'ChnFathername', 'dob' => 'hydDOB', 'address' => 'nameandaddress', 'fulladdress' => 'fulladdress'],
+        'columns' => ['Name', "Father's Name", 'Mobile No', 'Address', 'Address2', 'Alternative No', 'Additional No', 'DOB', 'RelationName', 'Relationship', 'Identity']],
+    'ka' => ['label' => 'Karnataka',      'indexPath' => '/BNG/Index',     'searchPath' => '/BNG/SearchData',
+        'modes' => ['mobile' => 'mobile', 'father' => 'nameandfathername', 'dob' => 'nameanddob', 'address' => 'nameandaddress', 'fulladdress' => 'fulladdress'],
+        'columns' => ['Name', 'Full Name', "Father's Name", 'Mobile No', 'DOB', 'Gender', 'Address1', 'Address2', 'Alternative No', 'Additional No', 'Email', 'Proof']],
+    'mh' => ['label' => 'Maharashtra',    'indexPath' => '/MUM/Index',     'searchPath' => '/Mum/SearchData',
+        'modes' => ['mobile' => 'mobile', 'father' => 'nameandfathername', 'dob' => 'nameanddob', 'address' => 'nameandaddress', 'fulladdress' => 'fulladdress'],
+        'columns' => ['Name', "Father's Name", 'Mobile No', 'DOB', 'Address', 'Alternative No', 'Additional No', 'Email']],
     // Kerala has no Name & D.O.B tab at all on its own page - not an
     // oversight, "dob" is simply absent from this state's modes map.
-    'kl' => ['label' => 'Kerala',         'indexPath' => '/Kerala/Index',  'searchPath' => '/Kerala/KeralaSearch',
-        'modes' => ['mobile' => 'mobile', 'father' => 'nameandfathername', 'address' => 'nameandaddress', 'fulladdress' => 'fulladdress']],
+    'kl' => ['label' => 'Kerala',         'indexPath' => '/Kerala/Index',  'searchPath' => '/Kerala/SearchData',
+        'modes' => ['mobile' => 'mobile', 'father' => 'nameandfathername', 'address' => 'nameandaddress', 'fulladdress' => 'fulladdress'],
+        'columns' => ['Name', "Father's Name", 'Mobile No', 'Address', 'Taluk', 'District']],
 ];
 
 // Same form field name per mode on every state's page (confirmed live
@@ -173,41 +197,29 @@ function tracekartEnsureSession(string $stateKey): ?string {
     return tracekartFetchStatePage($stateKey);
 }
 
-// Reads whatever table tracekart.in rendered inside #resultsContainer,
-// headers read generically (not hardcoded column names) same as
-// eagleEyeParseResults() - this site's own result columns were never
-// actually observed live (every test query came back "No records found"),
-// so hardcoding names here would be a guess; generic parsing works
-// regardless of what they turn out to be.
-function tracekartParseResults(string $html): array {
-    libxml_use_internal_errors(true);
-    $doc = new DOMDocument();
-    $doc->loadHTML('<?xml encoding="utf-8" ?>' . $html);
-    libxml_clear_errors();
-    $xpath = new DOMXPath($doc);
-
-    $containers = $xpath->query("//div[@id='resultsContainer']");
-    if ($containers->length === 0) return ['totalResults' => 0, 'headers' => [], 'rows' => []];
-    $container = $containers->item(0);
-
-    $headers = [];
-    foreach ($xpath->query('.//table//thead//th', $container) as $th) {
-        $headers[] = trim($th->textContent);
-    }
-
-    $rows = [];
-    foreach ($xpath->query('.//table//tbody//tr', $container) as $tr) {
+// Maps the new JSON endpoint's {"rows":[[...],...],...} body (each row a
+// plain positional array, no field names - see TRACEKART_STATES' own
+// 'columns' comment) into this function's long-standing output shape
+// (headers + rows-as-assoc-arrays-keyed-by-header), so nothing downstream
+// (advanced_search_api.php, includes/tracekart_archive.php) needs to
+// change for this vendor-side rewrite. A row shorter/longer than $columns
+// (seen live as a possibility given the vendor's own "identity column
+// only sent for some accounts" note) is handled positionally rather than
+// assumed fixed-width, so a format drift here degrades gracefully (extra
+// values under a generic "Column N" label, missing ones left blank)
+// instead of silently misaligning every other column.
+function tracekartParseJsonRows(array $rows, array $columns): array {
+    $mapped = [];
+    foreach ($rows as $row) {
+        if (!is_array($row)) continue;
         $cells = [];
-        $i = 0;
-        foreach ($xpath->query('.//td', $tr) as $td) {
-            $label = $headers[$i] ?? ('Column ' . ($i + 1));
-            $cells[$label] = trim($td->textContent);
-            $i++;
+        foreach ($row as $i => $value) {
+            $label = $columns[$i] ?? ('Column ' . ($i + 1));
+            $cells[$label] = (string) $value;
         }
-        if ($cells) $rows[] = $cells;
+        $mapped[] = $cells;
     }
-
-    return ['totalResults' => count($rows), 'headers' => $headers, 'rows' => $rows];
+    return ['totalResults' => count($mapped), 'headers' => $columns, 'rows' => $mapped];
 }
 
 function tracekartSearch(string $stateKey, string $mode, array $fields, bool $isRetry = false): array {
@@ -243,12 +255,15 @@ function tracekartSearch(string $stateKey, string $mode, array $fields, bool $is
     }
     $postFields['__RequestVerificationToken'] = $token;
 
+    // X-Requested-With matches what the vendor's own region-search.js sends
+    // (its post() helper) - this is a JSON AJAX endpoint now, not a plain
+    // form post (see the TRACEKART_STATES comment above).
     $ch = tracekartCurlHandle();
     curl_setopt_array($ch, [
         CURLOPT_URL => TRACEKART_BASE . $state['searchPath'],
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => http_build_query($postFields),
-        CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
+        CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded', 'X-Requested-With: XMLHttpRequest'],
     ]);
     $resp = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -270,5 +285,22 @@ function tracekartSearch(string $stateKey, string $mode, array $fields, bool $is
         throw new RuntimeException('Advanced Search failed (HTTP ' . $httpCode . ').');
     }
 
-    return tracekartParseResults((string) $resp);
+    $decoded = json_decode((string) $resp, true);
+    if (!is_array($decoded)) {
+        throw new RuntimeException('Advanced Search returned an unexpected response.');
+    }
+    // Same session-dropped case as the HTTP redirect above, just signaled
+    // in-body instead - region-search.js's own post() treats this exactly
+    // the same way (window.location.href = json.redirect).
+    if (!empty($decoded['redirect'])) {
+        if ($isRetry || !tracekartLogin()) {
+            throw new RuntimeException('Advanced Search session expired and re-login failed.');
+        }
+        return tracekartSearch($stateKey, $mode, $fields, true);
+    }
+    if (!empty($decoded['error'])) {
+        throw new RuntimeException('Advanced Search failed: ' . $decoded['error']);
+    }
+
+    return tracekartParseJsonRows($decoded['rows'] ?? [], $state['columns']);
 }
