@@ -830,11 +830,13 @@ require __DIR__ . '/../includes/header.php';
     <div class="acf-row">
       <input type="text" name="allowed_ips" placeholder="Allowed IPs (comma-separated, blank = any)"
              title="Restrict this account to signing in only from these exact IP addresses - comma or newline separated, no CIDR ranges. Leave blank to allow any network." style="min-width:260px">
+      <?php if (!$actingIsSubAdmin): ?>
       <label class="acf-inline-field"
              title="How many devices can be signed into this account at the same time. Logging in beyond this limit signs out whichever device has been idle longest.">
         Max Logins
         <input type="number" name="max_concurrent_sessions" value="1" min="1" max="50">
       </label>
+      <?php endif; ?>
       <input type="text" name="expires_date" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" maxlength="10"
              title="Expiry date, DD/MM/YYYY (leave blank for no expiry)" style="min-width:140px">
       <input type="time" name="expires_time" title="Expiry time (defaults to 00:00)" style="min-width:110px">
@@ -1188,7 +1190,7 @@ require __DIR__ . '/../includes/header.php';
         <input type="text" class="form-control" name="allowed_ips" id="edit-allowed_ips" placeholder="Blank = any network">
       </div>
       <div class="edit-settings-grid">
-        <div class="form-group">
+        <div class="form-group"<?= $actingIsSubAdmin ? ' style="display:none"' : '' ?>>
           <label class="form-label" for="edit-max_concurrent_sessions"
                  title="How many devices can be signed into this account at the same time. Logging in beyond this limit signs out whichever device has been idle longest.">
             Max Simultaneous Logins
