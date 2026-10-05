@@ -59,6 +59,21 @@ if (hasTracing2Access()) {
     $tracing2Index = hasAdvancedSearchAccess() ? 1 : 0;
     array_splice($searchRegionsExtra, $tracing2Index, 0, [['label' => 'Tracing 2.0', 'href' => 'tracing2.php']]);
 }
+// Mobile to Address (+ Advanced) - Nexora API lookups with no existing
+// equivalent in this CRM, moved up to sit directly after Advanced
+// Search/Tracing 2.0 per explicit instruction (previously grouped further
+// down with the other Nexora-backed tools). Same "insert right after
+// whatever's already claimed the top slots" index math as Tracing 2.0
+// above, extended one more step for each of those two that's actually
+// present.
+$mobileToAddressIndex = (hasAdvancedSearchAccess() ? 1 : 0) + (hasTracing2Access() ? 1 : 0);
+if (hasMobileToAddressAccess()) {
+    array_splice($searchRegionsExtra, $mobileToAddressIndex, 0, [['label' => 'Mobile to Address', 'href' => 'mobile_to_address.php']]);
+    $mobileToAddressIndex++;
+}
+if (hasMobileAddressAdvAccess()) {
+    array_splice($searchRegionsExtra, $mobileToAddressIndex, 0, [['label' => 'Mobile to Address Advanced', 'href' => 'mobile_address_advanced.php']]);
+}
 // Pan India is opt-in per account (Admin > Agents > "Pan India Access"),
 // same as LPG Search below (2026-08-19 - previously unconditional for every
 // logged-in user; migrate_add_pan_india_access.sql defaults existing
@@ -189,16 +204,6 @@ if (hasAadhaarToRationAccess()) {
 // placed directly below it. Own access flag + monthly quota.
 if (hasAadhaarFamilyApiAccess()) {
     $searchRegionsExtra[] = ['label' => 'Aadhaar to Family Advanced', 'href' => 'aadhaar_family_api.php'];
-}
-// Mobile to Address (+ Advanced) - Nexora API lookups with no existing
-// equivalent in this CRM. Own access flag + monthly quota each, placed
-// directly below Aadhaar to Family Advanced (the other Nexora-backed
-// tools).
-if (hasMobileToAddressAccess()) {
-    $searchRegionsExtra[] = ['label' => 'Mobile to Address', 'href' => 'mobile_to_address.php'];
-}
-if (hasMobileAddressAdvAccess()) {
-    $searchRegionsExtra[] = ['label' => 'Mobile to Address Advanced', 'href' => 'mobile_address_advanced.php'];
 }
 $selectedState = $_GET['state'] ?? '';
 
