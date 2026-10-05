@@ -814,13 +814,18 @@ require __DIR__ . '/../includes/header.php';
 
     <div class="acf-section-label"><i class="bi bi-shield-lock-fill"></i> Feature Access</div>
     <div class="acf-feature-grid">
-      <?php if (subAdminCanGrant('lpg_search_access')): ?>
+      <?php // LPG Search/Tracing 2.0 hidden from the admin grid (per explicit
+      // instruction) - same "false &&" pattern already used to hide LPG
+      // Search's own sidebar link in includes/header.php. Not deleted:
+      // still fully functional for any account that already has it, just
+      // no longer offered here to grant/revoke going forward. ?>
+      <?php if (false && subAdminCanGrant('lpg_search_access')): ?>
       <label class="acf-feature">
         <input type="checkbox" name="lpg_search_access" value="1">
         <span>LPG Search</span>
       </label>
       <?php endif; ?>
-      <?php if (subAdminCanGrant('tracing2_access')): ?>
+      <?php if (false && subAdminCanGrant('tracing2_access')): ?>
       <label class="acf-feature">
         <input type="checkbox" name="tracing2_access" id="create-tracing2_access" value="1">
         <span>Tracing 2.0</span>
@@ -982,7 +987,7 @@ require __DIR__ . '/../includes/header.php';
     </div>
     <?php endif; ?>
 
-    <?php if (subAdminCanGrant('tracing2_access')): ?>
+    <?php if (false && subAdminCanGrant('tracing2_access')): ?>
     <div class="acf-tracing2-tools" id="create-tracing2-tools-panel">
       <div class="acf-tracing2-tools-label"><i class="bi bi-geo-alt-fill"></i> Tracing 2.0 — Select Tools</div>
       <div class="acf-tools-grid">
@@ -1343,11 +1348,15 @@ require __DIR__ . '/../includes/header.php';
       <div class="form-group">
         <label class="form-label"><i class="bi bi-shield-lock-fill"></i> Feature Access</label>
         <div class="acf-feature-grid">
-          <label class="acf-feature"<?= subAdminCanGrant('lpg_search_access') ? '' : ' style="display:none"' ?>>
+          <!-- LPG Search/Tracing 2.0 hidden from the admin grid (per explicit
+               instruction), same as the create form above - kept in the DOM
+               (not PHP-removed) since several JS calls below reference these
+               two elements directly by id without a null guard. -->
+          <label class="acf-feature" style="display:none">
             <input type="checkbox" name="lpg_search_access" id="edit-lpg_search_access" value="1">
             <span>LPG Search</span>
           </label>
-          <label class="acf-feature"<?= subAdminCanGrant('tracing2_access') ? '' : ' style="display:none"' ?>>
+          <label class="acf-feature" style="display:none">
             <input type="checkbox" name="tracing2_access" id="edit-tracing2_access" value="1">
             <span>Tracing 2.0</span>
             <span class="acf-limit" title="Total locateme.services credits this agent can spend per calendar month, across whichever tools are checked below - a cheap 1-credit search and an expensive 150-credit search count differently against this budget, not 1-for-1. Ignored for admins.">
