@@ -28,7 +28,7 @@ $SUB_ADMIN_GRANTABLE_FIELDS = [
     'lpg_search_access', 'tracing2_access', 'rc_print_access', 'hp_gas_access',
     'indane_gas_access', 'indane_gas_pro_access', 'tata_play_access',
     'aadhaar_to_ration_access', 'eagle_eye_access', 'pan_india_access',
-    'pan_india_pro_access', 'advanced_search_access',
+    'pan_india_pro_access', 'advanced_search_access', 'whatsapp_button_access',
 ];
 $subAdminOwnAccess = [];
 $subAdminOwnTracing2Tools = null;
@@ -148,6 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $panIndiaProMonthlyLimit = min(65535, max(0, (int) ($_POST['pan_india_pro_monthly_limit'] ?? 5)));
         $advancedSearchAccess = isset($_POST['advanced_search_access']) ? 1 : 0;
         $advancedSearchMonthlyLimit = min(65535, max(0, (int) ($_POST['advanced_search_monthly_limit'] ?? 5)));
+        $whatsappButtonAccess = isset($_POST['whatsapp_button_access']) ? 1 : 0;
         $maxSessions = max(1, (int) ($_POST['max_concurrent_sessions'] ?? 1));
         $allowedIps = trim((string) ($_POST['allowed_ips'] ?? ''));
         $expiresDate  = trim($_POST['expires_date'] ?? '');
@@ -171,6 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$subAdminOwnAccess['pan_india_access'])     $panIndiaAccess = 0;
             if (!$subAdminOwnAccess['pan_india_pro_access']) $panIndiaProAccess = 0;
             if (!$subAdminOwnAccess['advanced_search_access']) $advancedSearchAccess = 0;
+            if (!$subAdminOwnAccess['whatsapp_button_access']) $whatsappButtonAccess = 0;
             // Tracing 2.0's own per-tool selection is capped to the
             // intersection with what the sub-admin can themselves use -
             // $subAdminOwnTracing2Tools === null means "every tool", so no
@@ -196,8 +198,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'danger';
         } else {
             $stmt = $pdo->prepare(
-                'INSERT INTO users (username, password_hash, full_name, mobile_no, role, created_by, lpg_search_access, tracing2_access, tracing2_monthly_limit, tracing2_tools, tracing2_tool_credits, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, indane_gas_access, indane_gas_monthly_limit, indane_gas_pro_access, tata_play_access, tata_play_monthly_limit, aadhaar_to_ration_access, aadhaar_to_ration_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, max_concurrent_sessions, allowed_ips, expires_at)
-                 VALUES (:username, :hash, :full_name, :mobile_no, :role, :created_by, :lpg_access, :tracing2_access, :tracing2_monthly_limit, :tracing2_tools, :tracing2_tool_credits, :rc_print_access, :rc_print_monthly_limit, :hp_gas_access, :hp_gas_monthly_limit, :indane_gas_access, :indane_gas_monthly_limit, :indane_gas_pro_access, :tata_play_access, :tata_play_monthly_limit, :aadhaar_to_ration_access, :aadhaar_to_ration_monthly_limit, :eagle_eye_access, :eagle_eye_monthly_limit, :pan_india_access, :pan_india_pro_access, :pan_india_pro_monthly_limit, :advanced_search_access, :advanced_search_monthly_limit, :max_sessions, :allowed_ips, :expires_at)'
+                'INSERT INTO users (username, password_hash, full_name, mobile_no, role, created_by, lpg_search_access, tracing2_access, tracing2_monthly_limit, tracing2_tools, tracing2_tool_credits, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, indane_gas_access, indane_gas_monthly_limit, indane_gas_pro_access, tata_play_access, tata_play_monthly_limit, aadhaar_to_ration_access, aadhaar_to_ration_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, whatsapp_button_access, max_concurrent_sessions, allowed_ips, expires_at)
+                 VALUES (:username, :hash, :full_name, :mobile_no, :role, :created_by, :lpg_access, :tracing2_access, :tracing2_monthly_limit, :tracing2_tools, :tracing2_tool_credits, :rc_print_access, :rc_print_monthly_limit, :hp_gas_access, :hp_gas_monthly_limit, :indane_gas_access, :indane_gas_monthly_limit, :indane_gas_pro_access, :tata_play_access, :tata_play_monthly_limit, :aadhaar_to_ration_access, :aadhaar_to_ration_monthly_limit, :eagle_eye_access, :eagle_eye_monthly_limit, :pan_india_access, :pan_india_pro_access, :pan_india_pro_monthly_limit, :advanced_search_access, :advanced_search_monthly_limit, :whatsapp_button_access, :max_sessions, :allowed_ips, :expires_at)'
             );
             try {
                 $stmt->execute([
@@ -230,6 +232,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'pan_india_pro_monthly_limit' => $panIndiaProMonthlyLimit,
                     'advanced_search_access' => $advancedSearchAccess,
                     'advanced_search_monthly_limit' => $advancedSearchMonthlyLimit,
+                    'whatsapp_button_access' => $whatsappButtonAccess,
                     'max_sessions' => $maxSessions,
                     'allowed_ips' => $allowedIps !== '' ? $allowedIps : null,
                     'expires_at'=> $expiresAtSql,
@@ -282,6 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $panIndiaProMonthlyLimit = min(65535, max(0, (int) ($_POST['pan_india_pro_monthly_limit'] ?? 5)));
         $advancedSearchAccess = isset($_POST['advanced_search_access']) ? 1 : 0;
         $advancedSearchMonthlyLimit = min(65535, max(0, (int) ($_POST['advanced_search_monthly_limit'] ?? 5)));
+        $whatsappButtonAccess = isset($_POST['whatsapp_button_access']) ? 1 : 0;
         $maxSessions = max(1, (int) ($_POST['max_concurrent_sessions'] ?? 1));
         $allowedIps = trim((string) ($_POST['allowed_ips'] ?? ''));
         $newPassword  = $_POST['new_password'] ?? '';
@@ -305,6 +309,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$subAdminOwnAccess['pan_india_access'])     $panIndiaAccess = 0;
             if (!$subAdminOwnAccess['pan_india_pro_access']) $panIndiaProAccess = 0;
             if (!$subAdminOwnAccess['advanced_search_access']) $advancedSearchAccess = 0;
+            if (!$subAdminOwnAccess['whatsapp_button_access']) $whatsappButtonAccess = 0;
             if ($subAdminOwnTracing2Tools !== null) {
                 $submittedTools = json_decode($tracing2Tools, true) ?: [];
                 $tracing2Tools = json_encode(array_values(array_intersect($submittedTools, $subAdminOwnTracing2Tools)));
@@ -318,7 +323,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message     = 'New password must be at least 6 characters (or leave it blank to keep the current one).';
             $messageType = 'danger';
         } else {
-            $sql = 'UPDATE users SET username = :username, full_name = :full_name, mobile_no = :mobile_no, role = :role, lpg_search_access = :lpg_access, tracing2_access = :tracing2_access, tracing2_monthly_limit = :tracing2_monthly_limit, tracing2_tools = :tracing2_tools, tracing2_tool_credits = :tracing2_tool_credits, rc_print_access = :rc_print_access, rc_print_monthly_limit = :rc_print_monthly_limit, hp_gas_access = :hp_gas_access, hp_gas_monthly_limit = :hp_gas_monthly_limit, indane_gas_access = :indane_gas_access, indane_gas_monthly_limit = :indane_gas_monthly_limit, indane_gas_pro_access = :indane_gas_pro_access, tata_play_access = :tata_play_access, tata_play_monthly_limit = :tata_play_monthly_limit, aadhaar_to_ration_access = :aadhaar_to_ration_access, aadhaar_to_ration_monthly_limit = :aadhaar_to_ration_monthly_limit, eagle_eye_access = :eagle_eye_access, eagle_eye_monthly_limit = :eagle_eye_monthly_limit, pan_india_access = :pan_india_access, pan_india_pro_access = :pan_india_pro_access, pan_india_pro_monthly_limit = :pan_india_pro_monthly_limit, advanced_search_access = :advanced_search_access, advanced_search_monthly_limit = :advanced_search_monthly_limit, max_concurrent_sessions = :max_sessions, allowed_ips = :allowed_ips, expires_at = :expires_at';
+            $sql = 'UPDATE users SET username = :username, full_name = :full_name, mobile_no = :mobile_no, role = :role, lpg_search_access = :lpg_access, tracing2_access = :tracing2_access, tracing2_monthly_limit = :tracing2_monthly_limit, tracing2_tools = :tracing2_tools, tracing2_tool_credits = :tracing2_tool_credits, rc_print_access = :rc_print_access, rc_print_monthly_limit = :rc_print_monthly_limit, hp_gas_access = :hp_gas_access, hp_gas_monthly_limit = :hp_gas_monthly_limit, indane_gas_access = :indane_gas_access, indane_gas_monthly_limit = :indane_gas_monthly_limit, indane_gas_pro_access = :indane_gas_pro_access, tata_play_access = :tata_play_access, tata_play_monthly_limit = :tata_play_monthly_limit, aadhaar_to_ration_access = :aadhaar_to_ration_access, aadhaar_to_ration_monthly_limit = :aadhaar_to_ration_monthly_limit, eagle_eye_access = :eagle_eye_access, eagle_eye_monthly_limit = :eagle_eye_monthly_limit, pan_india_access = :pan_india_access, pan_india_pro_access = :pan_india_pro_access, pan_india_pro_monthly_limit = :pan_india_pro_monthly_limit, advanced_search_access = :advanced_search_access, advanced_search_monthly_limit = :advanced_search_monthly_limit, whatsapp_button_access = :whatsapp_button_access, max_concurrent_sessions = :max_sessions, allowed_ips = :allowed_ips, expires_at = :expires_at';
             $params = [
                 'username'  => $username,
                 'full_name' => $fullName,
@@ -347,6 +352,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'pan_india_pro_monthly_limit' => $panIndiaProMonthlyLimit,
                 'advanced_search_access' => $advancedSearchAccess,
                 'advanced_search_monthly_limit' => $advancedSearchMonthlyLimit,
+                'whatsapp_button_access' => $whatsappButtonAccess,
                 'max_sessions' => $maxSessions,
                 'allowed_ips' => $allowedIps !== '' ? $allowedIps : null,
                 'expires_at'=> $expiresAtSql,
@@ -447,7 +453,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // still sees everyone. Every stat below, the table, and the CSV export all
 // flow from this one already-scoped $users list, so nothing downstream
 // needs its own per-row created_by check.
-$usersSelectSql = 'SELECT id, username, full_name, mobile_no, role, created_by, is_active, lpg_search_access, lpg_bookmarklet_key, tracing2_access, tracing2_monthly_limit, tracing2_tools, tracing2_tool_credits, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, indane_gas_access, indane_gas_monthly_limit, indane_gas_pro_access, tata_play_access, tata_play_monthly_limit, aadhaar_to_ration_access, aadhaar_to_ration_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, max_concurrent_sessions, allowed_ips, expires_at, created_at, last_login_at FROM users';
+$usersSelectSql = 'SELECT id, username, full_name, mobile_no, role, created_by, is_active, lpg_search_access, lpg_bookmarklet_key, tracing2_access, tracing2_monthly_limit, tracing2_tools, tracing2_tool_credits, rc_print_access, rc_print_monthly_limit, hp_gas_access, hp_gas_monthly_limit, indane_gas_access, indane_gas_monthly_limit, indane_gas_pro_access, tata_play_access, tata_play_monthly_limit, aadhaar_to_ration_access, aadhaar_to_ration_monthly_limit, eagle_eye_access, eagle_eye_monthly_limit, pan_india_access, pan_india_pro_access, pan_india_pro_monthly_limit, advanced_search_access, advanced_search_monthly_limit, whatsapp_button_access, max_concurrent_sessions, allowed_ips, expires_at, created_at, last_login_at FROM users';
 if ($actingIsSubAdmin) {
     $usersStmt = $pdo->prepare($usersSelectSql . ' WHERE created_by = :me ORDER BY created_at DESC');
     $usersStmt->execute(['me' => $_SESSION['user_id']]);
@@ -806,6 +812,12 @@ require __DIR__ . '/../includes/header.php';
         <span>Advanced Search</span>
       </label>
       <?php endif; ?>
+      <?php if (subAdminCanGrant('whatsapp_button_access')): ?>
+      <label class="acf-feature">
+        <input type="checkbox" name="whatsapp_button_access" value="1">
+        <span>WhatsApp Button</span>
+      </label>
+      <?php endif; ?>
     </div>
 
     <?php if (subAdminCanGrant('tracing2_access')): ?>
@@ -891,6 +903,7 @@ require __DIR__ . '/../includes/header.php';
           <th>Adv. Pan India</th>
           <th>Night Out</th>
           <th>Advanced Search</th>
+          <th>WhatsApp Button</th>
           <th>Set Expiry</th>
           <th>Actions</th>
         </tr>
@@ -1002,6 +1015,11 @@ require __DIR__ . '/../includes/header.php';
             </span>
           </td>
           <td>
+            <span class="badge <?= $u['whatsapp_button_access'] ? 'badge-success' : 'badge-neutral' ?>">
+              <?= $u['whatsapp_button_access'] ? 'Granted' : 'Not Granted' ?>
+            </span>
+          </td>
+          <td>
             <form method="post" class="expiry-form">
               <input type="hidden" name="action" value="set_expiry">
               <input type="hidden" name="id"     value="<?= (int) $u['id'] ?>">
@@ -1023,7 +1041,7 @@ require __DIR__ . '/../includes/header.php';
           </td>
           <td class="action-cell">
             <button type="button" class="btn btn-sm btn-secondary"
-                    onclick="openEditModal(<?= (int) $u['id'] ?>, <?= htmlspecialchars(json_encode($u['username']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['full_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['mobile_no'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['role']), ENT_QUOTES) ?>, <?= (int) $u['lpg_search_access'] ?>, <?= (int) $u['tracing2_access'] ?>, <?= (int) $u['tracing2_monthly_limit'] ?>, <?= htmlspecialchars(json_encode($u['tracing2_tools'] !== null ? (json_decode($u['tracing2_tools'], true) ?: []) : null), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['tracing2_tool_credits'] !== null ? (json_decode($u['tracing2_tool_credits'], true) ?: []) : null), ENT_QUOTES) ?>, <?= (int) $u['rc_print_access'] ?>, <?= (int) $u['rc_print_monthly_limit'] ?>, <?= (int) $u['hp_gas_access'] ?>, <?= (int) $u['hp_gas_monthly_limit'] ?>, <?= (int) $u['indane_gas_access'] ?>, <?= (int) $u['indane_gas_monthly_limit'] ?>, <?= (int) $u['indane_gas_pro_access'] ?>, <?= (int) $u['tata_play_access'] ?>, <?= (int) $u['tata_play_monthly_limit'] ?>, <?= (int) $u['aadhaar_to_ration_access'] ?>, <?= (int) $u['aadhaar_to_ration_monthly_limit'] ?>, <?= (int) $u['eagle_eye_access'] ?>, <?= (int) $u['eagle_eye_monthly_limit'] ?>, <?= (int) $u['pan_india_access'] ?>, <?= (int) $u['pan_india_pro_access'] ?>, <?= (int) $u['pan_india_pro_monthly_limit'] ?>, <?= (int) $u['advanced_search_access'] ?>, <?= (int) $u['advanced_search_monthly_limit'] ?>, <?= (int) $u['max_concurrent_sessions'] ?>, <?= htmlspecialchars(json_encode($u['allowed_ips'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($expiryDateValue), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($expiryTimeValue), ENT_QUOTES) ?>)">
+                    onclick="openEditModal(<?= (int) $u['id'] ?>, <?= htmlspecialchars(json_encode($u['username']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['full_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['mobile_no'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['role']), ENT_QUOTES) ?>, <?= (int) $u['lpg_search_access'] ?>, <?= (int) $u['tracing2_access'] ?>, <?= (int) $u['tracing2_monthly_limit'] ?>, <?= htmlspecialchars(json_encode($u['tracing2_tools'] !== null ? (json_decode($u['tracing2_tools'], true) ?: []) : null), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($u['tracing2_tool_credits'] !== null ? (json_decode($u['tracing2_tool_credits'], true) ?: []) : null), ENT_QUOTES) ?>, <?= (int) $u['rc_print_access'] ?>, <?= (int) $u['rc_print_monthly_limit'] ?>, <?= (int) $u['hp_gas_access'] ?>, <?= (int) $u['hp_gas_monthly_limit'] ?>, <?= (int) $u['indane_gas_access'] ?>, <?= (int) $u['indane_gas_monthly_limit'] ?>, <?= (int) $u['indane_gas_pro_access'] ?>, <?= (int) $u['tata_play_access'] ?>, <?= (int) $u['tata_play_monthly_limit'] ?>, <?= (int) $u['aadhaar_to_ration_access'] ?>, <?= (int) $u['aadhaar_to_ration_monthly_limit'] ?>, <?= (int) $u['eagle_eye_access'] ?>, <?= (int) $u['eagle_eye_monthly_limit'] ?>, <?= (int) $u['pan_india_access'] ?>, <?= (int) $u['pan_india_pro_access'] ?>, <?= (int) $u['pan_india_pro_monthly_limit'] ?>, <?= (int) $u['advanced_search_access'] ?>, <?= (int) $u['advanced_search_monthly_limit'] ?>, <?= (int) $u['whatsapp_button_access'] ?>, <?= (int) $u['max_concurrent_sessions'] ?>, <?= htmlspecialchars(json_encode($u['allowed_ips'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($expiryDateValue), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($expiryTimeValue), ENT_QUOTES) ?>)">
               <i class="bi bi-pencil-square"></i> Edit
             </button>
             <?php if ($u['lpg_search_access'] && $u['lpg_bookmarklet_key']): ?>
@@ -1163,6 +1181,10 @@ require __DIR__ . '/../includes/header.php';
             <input type="checkbox" name="advanced_search_access" id="edit-advanced_search_access" value="1">
             <span>Advanced Search</span>
           </label>
+          <label class="acf-feature"<?= subAdminCanGrant('whatsapp_button_access') ? '' : ' style="display:none"' ?>>
+            <input type="checkbox" name="whatsapp_button_access" id="edit-whatsapp_button_access" value="1">
+            <span>WhatsApp Button</span>
+          </label>
         </div>
         <div class="acf-tracing2-tools" id="edit-tracing2-tools-panel">
           <div class="acf-tracing2-tools-label"><i class="bi bi-geo-alt-fill"></i> Tracing 2.0 — Select Tools</div>
@@ -1228,7 +1250,7 @@ require __DIR__ . '/../includes/header.php';
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
-function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, tracing2Access, tracing2MonthlyLimit, tracing2Tools, tracing2ToolCredits, rcPrintAccess, rcPrintMonthlyLimit, hpGasAccess, hpGasMonthlyLimit, indaneGasAccess, indaneGasMonthlyLimit, indaneGasProAccess, tataPlayAccess, tataPlayMonthlyLimit, aadhaarToRationAccess, aadhaarToRationMonthlyLimit, eagleEyeAccess, eagleEyeMonthlyLimit, panIndiaAccess, panIndiaProAccess, panIndiaProMonthlyLimit, advancedSearchAccess, advancedSearchMonthlyLimit, maxSessions, allowedIps, expiresDate, expiresTime) {
+function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, tracing2Access, tracing2MonthlyLimit, tracing2Tools, tracing2ToolCredits, rcPrintAccess, rcPrintMonthlyLimit, hpGasAccess, hpGasMonthlyLimit, indaneGasAccess, indaneGasMonthlyLimit, indaneGasProAccess, tataPlayAccess, tataPlayMonthlyLimit, aadhaarToRationAccess, aadhaarToRationMonthlyLimit, eagleEyeAccess, eagleEyeMonthlyLimit, panIndiaAccess, panIndiaProAccess, panIndiaProMonthlyLimit, advancedSearchAccess, advancedSearchMonthlyLimit, whatsappButtonAccess, maxSessions, allowedIps, expiresDate, expiresTime) {
   document.getElementById('edit-id').value = id;
   document.getElementById('edit-username').value = username;
   document.getElementById('edit-full_name').value = fullName;
@@ -1273,6 +1295,7 @@ function openEditModal(id, username, fullName, mobileNo, role, lpgAccess, tracin
   document.getElementById('edit-pan_india_access').checked = !!panIndiaAccess;
   document.getElementById('edit-pan_india_pro_access').checked = !!panIndiaProAccess;
   document.getElementById('edit-advanced_search_access').checked = !!advancedSearchAccess;
+  document.getElementById('edit-whatsapp_button_access').checked = !!whatsappButtonAccess;
   document.getElementById('edit-max_concurrent_sessions').value = maxSessions;
   document.getElementById('edit-allowed_ips').value = allowedIps || '';
   document.getElementById('edit-expires_date').value = expiresDate;
@@ -1417,6 +1440,7 @@ const AGENTS_EXPORT_DATA = <?= json_encode(array_map(function ($u) {
         'adv_pan_india' => $u['eagle_eye_access'] ? 'Granted' : 'Not Granted',
         'pan_india_pro' => $u['pan_india_pro_access'] ? 'Granted' : 'Not Granted',
         'advanced_search' => $u['advanced_search_access'] ? 'Granted' : 'Not Granted',
+        'whatsapp_button' => $u['whatsapp_button_access'] ? 'Granted' : 'Not Granted',
         'max_logins' => $u['max_concurrent_sessions'],
         'allowed_ips' => $u['allowed_ips'] ?: 'Any',
         'expires_at' => $u['expires_at'] ? date('d/m/Y H:i', strtotime($u['expires_at'])) : 'No expiry',
@@ -1426,10 +1450,10 @@ const AGENTS_EXPORT_DATA = <?= json_encode(array_map(function ($u) {
 }, $users), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 
 document.getElementById('export-accounts-btn').addEventListener('click', () => {
-  const headers = ['ID', 'Username', 'Full Name', 'Mobile Number', 'Role', 'Created By', 'Status', 'LPG', 'Tracing 2.0', 'Pan India', 'RC Print', 'HP Gas', 'Indane Gas', 'Indane Gas Pro', 'TATA SKY DTH', 'Aadhaar to Family Members', 'Adv. Pan India', 'Night Out', 'Advanced Search', 'Max Logins', 'Allowed IPs', 'Expiry', 'Created At', 'Last Login'];
+  const headers = ['ID', 'Username', 'Full Name', 'Mobile Number', 'Role', 'Created By', 'Status', 'LPG', 'Tracing 2.0', 'Pan India', 'RC Print', 'HP Gas', 'Indane Gas', 'Indane Gas Pro', 'TATA SKY DTH', 'Aadhaar to Family Members', 'Adv. Pan India', 'Night Out', 'Advanced Search', 'WhatsApp Button', 'Max Logins', 'Allowed IPs', 'Expiry', 'Created At', 'Last Login'];
   const aoa = [headers, ...AGENTS_EXPORT_DATA.map(u => [
     u.id, u.username, u.full_name, u.mobile_no, u.role, u.created_by, u.status, u.lpg, u.tracing2, u.pan_india,
-    u.rc_print, u.hp_gas, u.indane_gas, u.indane_gas_pro, u.tata_play, u.aadhaar_to_ration, u.adv_pan_india, u.pan_india_pro, u.advanced_search, u.max_logins, u.allowed_ips, u.expires_at, u.created_at, u.last_login_at,
+    u.rc_print, u.hp_gas, u.indane_gas, u.indane_gas_pro, u.tata_play, u.aadhaar_to_ration, u.adv_pan_india, u.pan_india_pro, u.advanced_search, u.whatsapp_button, u.max_logins, u.allowed_ips, u.expires_at, u.created_at, u.last_login_at,
   ])];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
