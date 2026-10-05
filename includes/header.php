@@ -148,10 +148,18 @@ if (hasIndaneGasProAccess()) {
 if (hasAllGasAccess()) {
     $searchRegionsExtra[] = ['label' => 'All Gas', 'href' => 'all_gas.php'];
 }
+// All Gas Advanced - a combined tabbed view over Indian/HP Gas (existing
+// locateme.services tools) plus Indian/HP/Bharat Gas Advanced (Nexora),
+// placed directly below All Gas. No access flag of its own - shows for any
+// account with at least one of the five underlying tools granted (the page
+// itself hides whichever tabs an account doesn't have).
+if (hasIndaneGasAccess() || hasIndianGasApiAccess() || hasHpGasAccess() || hasHpGasApiAccess() || hasBharatGasApiAccess()) {
+    $searchRegionsExtra[] = ['label' => 'All Gas Advanced', 'href' => 'all_gas_advanced.php'];
+}
 // Indian/HP/Bharat Gas Advanced (Nexora API) - independently-sourced second
 // options alongside the existing locateme.services-backed Indane Gas/HP LPG
-// Search (Bharat Gas has no existing equivalent). Own access flag + monthly
-// quota each, placed directly below All Gas.
+// Search (Bharat Gas has no existing equivalent), also reachable as tabs on
+// All Gas Advanced above. Own access flag + monthly quota each.
 if (hasIndianGasApiAccess()) {
     $searchRegionsExtra[] = ['label' => 'Indian Gas Advanced', 'href' => 'indian_gas_api.php'];
 }
