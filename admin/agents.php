@@ -619,6 +619,15 @@ require __DIR__ . '/../includes/header.php';
     color:var(--c-text-soft);margin-bottom:8px;display:flex;align-items:center;gap:6px;}
   .acf-section-label i{color:var(--c-accent);font-size:12px;}
   .acf-feature-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:14px;}
+  /* Groups a related set of tools (e.g. the 5 tabs on all_gas_advanced.php)
+     under one bordered card with its own title, instead of scattering them
+     through the flat grid above - so configuring access for a combined
+     page like All Gas Advanced is one glance instead of hunting through
+     the whole grid for its pieces. */
+  .acf-group{border:1px solid var(--c-border);border-radius:var(--r-md);padding:12px 14px 2px;margin-bottom:14px;}
+  .acf-group-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+    color:var(--c-accent);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+  .acf-group .acf-feature-grid{margin-bottom:12px;}
   .acf-feature{position:relative;display:flex;align-items:center;gap:10px;padding:10px 12px 10px 14px;
     border:1px solid var(--c-border);border-radius:var(--r-md);background:var(--c-surface-2);
     font-size:12.5px;font-weight:600;color:var(--c-text);cursor:pointer;
@@ -835,24 +844,6 @@ require __DIR__ . '/../includes/header.php';
         </span>
       </label>
       <?php endif; ?>
-      <?php if (subAdminCanGrant('hp_gas_access')): ?>
-      <label class="acf-feature">
-        <input type="checkbox" name="hp_gas_access" value="1">
-        <span>HP LPG Search</span>
-        <span class="acf-limit" title="How many HP LPG searches this agent can run per calendar month - each one spends real credits (150/search) on the shared locateme.services account. Ignored for admins.">
-          <input type="number" name="hp_gas_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-        </span>
-      </label>
-      <?php endif; ?>
-      <?php if (subAdminCanGrant('indane_gas_access')): ?>
-      <label class="acf-feature">
-        <input type="checkbox" name="indane_gas_access" value="1">
-        <span>Indane Gas</span>
-        <span class="acf-limit" title="How many Indane Gas searches this agent can run per calendar month - each one spends real credits (100/search) on the shared locateme.services account. Ignored for admins.">
-          <input type="number" name="indane_gas_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-        </span>
-      </label>
-      <?php endif; ?>
       <?php if (subAdminCanGrant('indane_gas_pro_access')): ?>
       <label class="acf-feature">
         <input type="checkbox" name="indane_gas_pro_access" value="1">
@@ -918,33 +909,6 @@ require __DIR__ . '/../includes/header.php';
         </span>
       </label>
       <?php endif; ?>
-      <?php if (subAdminCanGrant('indian_gas_api_access')): ?>
-      <label class="acf-feature">
-        <input type="checkbox" name="indian_gas_api_access" value="1">
-        <span>Indian Gas Advanced</span>
-        <span class="acf-limit" title="How many searches this agent can run per calendar month on Indian Gas Advanced - every search counts, found or not, since each spends real credits on the shared Nexora API account. Ignored for admins.">
-          <input type="number" name="indian_gas_api_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()">/mo
-        </span>
-      </label>
-      <?php endif; ?>
-      <?php if (subAdminCanGrant('hp_gas_api_access')): ?>
-      <label class="acf-feature">
-        <input type="checkbox" name="hp_gas_api_access" value="1">
-        <span>HP Gas Advanced</span>
-        <span class="acf-limit" title="How many searches this agent can run per calendar month on HP Gas Advanced - every search counts, found or not, since each spends real credits on the shared Nexora API account. Ignored for admins.">
-          <input type="number" name="hp_gas_api_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()">/mo
-        </span>
-      </label>
-      <?php endif; ?>
-      <?php if (subAdminCanGrant('bharat_gas_api_access')): ?>
-      <label class="acf-feature">
-        <input type="checkbox" name="bharat_gas_api_access" value="1">
-        <span>Bharat Gas Advanced</span>
-        <span class="acf-limit" title="How many searches this agent can run per calendar month on Bharat Gas Advanced - every search counts, found or not, since each spends real credits on the shared Nexora API account. Ignored for admins.">
-          <input type="number" name="bharat_gas_api_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()">/mo
-        </span>
-      </label>
-      <?php endif; ?>
       <?php if (subAdminCanGrant('mobile_to_address_access')): ?>
       <label class="acf-feature">
         <input type="checkbox" name="mobile_to_address_access" value="1">
@@ -964,6 +928,59 @@ require __DIR__ . '/../includes/header.php';
       </label>
       <?php endif; ?>
     </div>
+
+    <?php if (subAdminCanGrant('indane_gas_access') || subAdminCanGrant('indian_gas_api_access') || subAdminCanGrant('hp_gas_access') || subAdminCanGrant('hp_gas_api_access') || subAdminCanGrant('bharat_gas_api_access')): ?>
+    <div class="acf-group">
+      <div class="acf-group-title"><i class="bi bi-fire"></i> All Gas Advanced</div>
+      <div class="acf-feature-grid">
+        <?php if (subAdminCanGrant('indane_gas_access')): ?>
+        <label class="acf-feature">
+          <input type="checkbox" name="indane_gas_access" value="1">
+          <span>Indian Gas</span>
+          <span class="acf-limit" title="How many Indane Gas searches this agent can run per calendar month - each one spends real credits (100/search) on the shared locateme.services account. Ignored for admins.">
+            <input type="number" name="indane_gas_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
+          </span>
+        </label>
+        <?php endif; ?>
+        <?php if (subAdminCanGrant('indian_gas_api_access')): ?>
+        <label class="acf-feature">
+          <input type="checkbox" name="indian_gas_api_access" value="1">
+          <span>Indian Gas Advanced</span>
+          <span class="acf-limit" title="How many searches this agent can run per calendar month on Indian Gas Advanced - every search counts, found or not, since each spends real credits on the shared Nexora API account. Ignored for admins.">
+            <input type="number" name="indian_gas_api_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()">/mo
+          </span>
+        </label>
+        <?php endif; ?>
+        <?php if (subAdminCanGrant('hp_gas_access')): ?>
+        <label class="acf-feature">
+          <input type="checkbox" name="hp_gas_access" value="1">
+          <span>HP Gas</span>
+          <span class="acf-limit" title="How many HP LPG searches this agent can run per calendar month - each one spends real credits (150/search) on the shared locateme.services account. Ignored for admins.">
+            <input type="number" name="hp_gas_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
+          </span>
+        </label>
+        <?php endif; ?>
+        <?php if (subAdminCanGrant('hp_gas_api_access')): ?>
+        <label class="acf-feature">
+          <input type="checkbox" name="hp_gas_api_access" value="1">
+          <span>HP Gas Advanced</span>
+          <span class="acf-limit" title="How many searches this agent can run per calendar month on HP Gas Advanced - every search counts, found or not, since each spends real credits on the shared Nexora API account. Ignored for admins.">
+            <input type="number" name="hp_gas_api_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()">/mo
+          </span>
+        </label>
+        <?php endif; ?>
+        <?php if (subAdminCanGrant('bharat_gas_api_access')): ?>
+        <label class="acf-feature">
+          <input type="checkbox" name="bharat_gas_api_access" value="1">
+          <span>Bharat Gas Advanced</span>
+          <span class="acf-limit" title="How many searches this agent can run per calendar month on Bharat Gas Advanced - every search counts, found or not, since each spends real credits on the shared Nexora API account. Ignored for admins.">
+            <input type="number" name="bharat_gas_api_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()">/mo
+          </span>
+        </label>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php endif; ?>
 
     <?php if (subAdminCanGrant('tracing2_access')): ?>
     <div class="acf-tracing2-tools" id="create-tracing2-tools-panel">
@@ -1348,20 +1365,6 @@ require __DIR__ . '/../includes/header.php';
               <input type="number" name="rc_print_monthly_limit" id="edit-rc_print_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
             </span>
           </label>
-          <label class="acf-feature"<?= subAdminCanGrant('hp_gas_access') ? '' : ' style="display:none"' ?>>
-            <input type="checkbox" name="hp_gas_access" id="edit-hp_gas_access" value="1">
-            <span>HP LPG Search</span>
-            <span class="acf-limit" title="How many HP LPG searches this agent can run per calendar month - each one spends real credits (150/search) on the shared locateme.services account. Ignored for admins.">
-              <input type="number" name="hp_gas_monthly_limit" id="edit-hp_gas_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-            </span>
-          </label>
-          <label class="acf-feature"<?= subAdminCanGrant('indane_gas_access') ? '' : ' style="display:none"' ?>>
-            <input type="checkbox" name="indane_gas_access" id="edit-indane_gas_access" value="1">
-            <span>Indane Gas</span>
-            <span class="acf-limit" title="How many Indane Gas searches this agent can run per calendar month - each one spends real credits (100/search) on the shared locateme.services account. Ignored for admins.">
-              <input type="number" name="indane_gas_monthly_limit" id="edit-indane_gas_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
-            </span>
-          </label>
           <label class="acf-feature"<?= subAdminCanGrant('indane_gas_pro_access') ? '' : ' style="display:none"' ?>>
             <input type="checkbox" name="indane_gas_pro_access" id="edit-indane_gas_pro_access" value="1">
             <span>Indane Gas Pro</span>
@@ -1409,27 +1412,6 @@ require __DIR__ . '/../includes/header.php';
               <input type="number" name="aadhaar_family_api_monthly_limit" id="edit-aadhaar_family_api_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()">/mo
             </span>
           </label>
-          <label class="acf-feature"<?= subAdminCanGrant('indian_gas_api_access') ? '' : ' style="display:none"' ?>>
-            <input type="checkbox" name="indian_gas_api_access" id="edit-indian_gas_api_access" value="1">
-            <span>Indian Gas Advanced</span>
-            <span class="acf-limit" title="How many searches this agent can run per calendar month on Indian Gas Advanced - every search counts, found or not, since each spends real credits on the shared Nexora API account. Ignored for admins.">
-              <input type="number" name="indian_gas_api_monthly_limit" id="edit-indian_gas_api_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()">/mo
-            </span>
-          </label>
-          <label class="acf-feature"<?= subAdminCanGrant('hp_gas_api_access') ? '' : ' style="display:none"' ?>>
-            <input type="checkbox" name="hp_gas_api_access" id="edit-hp_gas_api_access" value="1">
-            <span>HP Gas Advanced</span>
-            <span class="acf-limit" title="How many searches this agent can run per calendar month on HP Gas Advanced - every search counts, found or not, since each spends real credits on the shared Nexora API account. Ignored for admins.">
-              <input type="number" name="hp_gas_api_monthly_limit" id="edit-hp_gas_api_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()">/mo
-            </span>
-          </label>
-          <label class="acf-feature"<?= subAdminCanGrant('bharat_gas_api_access') ? '' : ' style="display:none"' ?>>
-            <input type="checkbox" name="bharat_gas_api_access" id="edit-bharat_gas_api_access" value="1">
-            <span>Bharat Gas Advanced</span>
-            <span class="acf-limit" title="How many searches this agent can run per calendar month on Bharat Gas Advanced - every search counts, found or not, since each spends real credits on the shared Nexora API account. Ignored for admins.">
-              <input type="number" name="bharat_gas_api_monthly_limit" id="edit-bharat_gas_api_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()">/mo
-            </span>
-          </label>
           <label class="acf-feature"<?= subAdminCanGrant('mobile_to_address_access') ? '' : ' style="display:none"' ?>>
             <input type="checkbox" name="mobile_to_address_access" id="edit-mobile_to_address_access" value="1">
             <span>Mobile to Address</span>
@@ -1445,6 +1427,50 @@ require __DIR__ . '/../includes/header.php';
             </span>
           </label>
         </div>
+
+        <?php if (subAdminCanGrant('indane_gas_access') || subAdminCanGrant('indian_gas_api_access') || subAdminCanGrant('hp_gas_access') || subAdminCanGrant('hp_gas_api_access') || subAdminCanGrant('bharat_gas_api_access')): ?>
+        <div class="acf-group">
+          <div class="acf-group-title"><i class="bi bi-fire"></i> All Gas Advanced</div>
+          <div class="acf-feature-grid">
+            <label class="acf-feature"<?= subAdminCanGrant('indane_gas_access') ? '' : ' style="display:none"' ?>>
+              <input type="checkbox" name="indane_gas_access" id="edit-indane_gas_access" value="1">
+              <span>Indian Gas</span>
+              <span class="acf-limit" title="How many Indane Gas searches this agent can run per calendar month - each one spends real credits (100/search) on the shared locateme.services account. Ignored for admins.">
+                <input type="number" name="indane_gas_monthly_limit" id="edit-indane_gas_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
+              </span>
+            </label>
+            <label class="acf-feature"<?= subAdminCanGrant('indian_gas_api_access') ? '' : ' style="display:none"' ?>>
+              <input type="checkbox" name="indian_gas_api_access" id="edit-indian_gas_api_access" value="1">
+              <span>Indian Gas Advanced</span>
+              <span class="acf-limit" title="How many searches this agent can run per calendar month on Indian Gas Advanced - every search counts, found or not, since each spends real credits on the shared Nexora API account. Ignored for admins.">
+                <input type="number" name="indian_gas_api_monthly_limit" id="edit-indian_gas_api_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()">/mo
+              </span>
+            </label>
+            <label class="acf-feature"<?= subAdminCanGrant('hp_gas_access') ? '' : ' style="display:none"' ?>>
+              <input type="checkbox" name="hp_gas_access" id="edit-hp_gas_access" value="1">
+              <span>HP Gas</span>
+              <span class="acf-limit" title="How many HP LPG searches this agent can run per calendar month - each one spends real credits (150/search) on the shared locateme.services account. Ignored for admins.">
+                <input type="number" name="hp_gas_monthly_limit" id="edit-hp_gas_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
+              </span>
+            </label>
+            <label class="acf-feature"<?= subAdminCanGrant('hp_gas_api_access') ? '' : ' style="display:none"' ?>>
+              <input type="checkbox" name="hp_gas_api_access" id="edit-hp_gas_api_access" value="1">
+              <span>HP Gas Advanced</span>
+              <span class="acf-limit" title="How many searches this agent can run per calendar month on HP Gas Advanced - every search counts, found or not, since each spends real credits on the shared Nexora API account. Ignored for admins.">
+                <input type="number" name="hp_gas_api_monthly_limit" id="edit-hp_gas_api_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()">/mo
+              </span>
+            </label>
+            <label class="acf-feature"<?= subAdminCanGrant('bharat_gas_api_access') ? '' : ' style="display:none"' ?>>
+              <input type="checkbox" name="bharat_gas_api_access" id="edit-bharat_gas_api_access" value="1">
+              <span>Bharat Gas Advanced</span>
+              <span class="acf-limit" title="How many searches this agent can run per calendar month on Bharat Gas Advanced - every search counts, found or not, since each spends real credits on the shared Nexora API account. Ignored for admins.">
+                <input type="number" name="bharat_gas_api_monthly_limit" id="edit-bharat_gas_api_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()">/mo
+              </span>
+            </label>
+          </div>
+        </div>
+        <?php endif; ?>
+
         <div class="acf-tracing2-tools" id="edit-tracing2-tools-panel">
           <div class="acf-tracing2-tools-label"><i class="bi bi-geo-alt-fill"></i> Tracing 2.0 — Select Tools</div>
           <div class="acf-tools-grid">
