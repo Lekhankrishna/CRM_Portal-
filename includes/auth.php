@@ -493,6 +493,107 @@ function requireAadhaarFamilyApiAccess(string $loginPath = 'login.php'): void {
     }
 }
 
+// Same pattern as hasAadhaarFamilyApiAccess() - checked fresh from the DB
+// every request. Defaults to NOT granted (see migrate_add_indian_gas_api.sql).
+function hasIndianGasApiAccess(): bool {
+    global $pdo;
+    if (!isLoggedIn()) return false;
+    static $access = null;
+    if ($access !== null) return $access;
+    $stmt = $pdo->prepare('SELECT indian_gas_api_access FROM users WHERE id = :id');
+    $stmt->execute(['id' => $_SESSION['user_id']]);
+    $access = (bool) $stmt->fetchColumn();
+    return $access;
+}
+
+function requireIndianGasApiAccess(string $loginPath = 'login.php'): void {
+    requireLogin($loginPath);
+    if (!hasIndianGasApiAccess()) {
+        http_response_code(403);
+        die('Access denied: Indian Gas Advanced access has not been granted for this account.');
+    }
+}
+
+// Defaults to NOT granted (see migrate_add_hp_gas_api.sql).
+function hasHpGasApiAccess(): bool {
+    global $pdo;
+    if (!isLoggedIn()) return false;
+    static $access = null;
+    if ($access !== null) return $access;
+    $stmt = $pdo->prepare('SELECT hp_gas_api_access FROM users WHERE id = :id');
+    $stmt->execute(['id' => $_SESSION['user_id']]);
+    $access = (bool) $stmt->fetchColumn();
+    return $access;
+}
+
+function requireHpGasApiAccess(string $loginPath = 'login.php'): void {
+    requireLogin($loginPath);
+    if (!hasHpGasApiAccess()) {
+        http_response_code(403);
+        die('Access denied: HP Gas Advanced access has not been granted for this account.');
+    }
+}
+
+// Defaults to NOT granted (see migrate_add_bharat_gas_api.sql).
+function hasBharatGasApiAccess(): bool {
+    global $pdo;
+    if (!isLoggedIn()) return false;
+    static $access = null;
+    if ($access !== null) return $access;
+    $stmt = $pdo->prepare('SELECT bharat_gas_api_access FROM users WHERE id = :id');
+    $stmt->execute(['id' => $_SESSION['user_id']]);
+    $access = (bool) $stmt->fetchColumn();
+    return $access;
+}
+
+function requireBharatGasApiAccess(string $loginPath = 'login.php'): void {
+    requireLogin($loginPath);
+    if (!hasBharatGasApiAccess()) {
+        http_response_code(403);
+        die('Access denied: Bharat Gas Advanced access has not been granted for this account.');
+    }
+}
+
+// Defaults to NOT granted (see migrate_add_mobile_to_address.sql).
+function hasMobileToAddressAccess(): bool {
+    global $pdo;
+    if (!isLoggedIn()) return false;
+    static $access = null;
+    if ($access !== null) return $access;
+    $stmt = $pdo->prepare('SELECT mobile_to_address_access FROM users WHERE id = :id');
+    $stmt->execute(['id' => $_SESSION['user_id']]);
+    $access = (bool) $stmt->fetchColumn();
+    return $access;
+}
+
+function requireMobileToAddressAccess(string $loginPath = 'login.php'): void {
+    requireLogin($loginPath);
+    if (!hasMobileToAddressAccess()) {
+        http_response_code(403);
+        die('Access denied: Mobile to Address access has not been granted for this account.');
+    }
+}
+
+// Defaults to NOT granted (see migrate_add_mobile_address_adv.sql).
+function hasMobileAddressAdvAccess(): bool {
+    global $pdo;
+    if (!isLoggedIn()) return false;
+    static $access = null;
+    if ($access !== null) return $access;
+    $stmt = $pdo->prepare('SELECT mobile_address_adv_access FROM users WHERE id = :id');
+    $stmt->execute(['id' => $_SESSION['user_id']]);
+    $access = (bool) $stmt->fetchColumn();
+    return $access;
+}
+
+function requireMobileAddressAdvAccess(string $loginPath = 'login.php'): void {
+    requireLogin($loginPath);
+    if (!hasMobileAddressAdvAccess()) {
+        http_response_code(403);
+        die('Access denied: Mobile to Address Advanced access has not been granted for this account.');
+    }
+}
+
 // Global settings row (id = 1) — created by migrate_add_whatsapp_button.sql.
 // Cached per-request; an admin's save on whatsapp_settings.php takes effect
 // on the very next request for every user, not just after their next login.

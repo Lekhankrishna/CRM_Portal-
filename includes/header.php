@@ -148,6 +148,19 @@ if (hasIndaneGasProAccess()) {
 if (hasAllGasAccess()) {
     $searchRegionsExtra[] = ['label' => 'All Gas', 'href' => 'all_gas.php'];
 }
+// Indian/HP/Bharat Gas Advanced (Nexora API) - independently-sourced second
+// options alongside the existing locateme.services-backed Indane Gas/HP LPG
+// Search (Bharat Gas has no existing equivalent). Own access flag + monthly
+// quota each, placed directly below All Gas.
+if (hasIndianGasApiAccess()) {
+    $searchRegionsExtra[] = ['label' => 'Indian Gas Advanced', 'href' => 'indian_gas_api.php'];
+}
+if (hasHpGasApiAccess()) {
+    $searchRegionsExtra[] = ['label' => 'HP Gas Advanced', 'href' => 'hp_gas_advanced.php'];
+}
+if (hasBharatGasApiAccess()) {
+    $searchRegionsExtra[] = ['label' => 'Bharat Gas Advanced', 'href' => 'bharat_gas_advanced.php'];
+}
 // Tata Play is opt-in per account (Admin > Agents > "Tata Play Access") -
 // same pattern as HP LPG Search above (own tataplay.py Selenium automation
 // against the distributor's mysso.tataplay.com SSO login, proxied through
@@ -168,6 +181,16 @@ if (hasAadhaarToRationAccess()) {
 // placed directly below it. Own access flag + monthly quota.
 if (hasAadhaarFamilyApiAccess()) {
     $searchRegionsExtra[] = ['label' => 'Aadhaar to Family Advanced', 'href' => 'aadhaar_family_api.php'];
+}
+// Mobile to Address (+ Advanced) - Nexora API lookups with no existing
+// equivalent in this CRM. Own access flag + monthly quota each, placed
+// directly below Aadhaar to Family Advanced (the other Nexora-backed
+// tools).
+if (hasMobileToAddressAccess()) {
+    $searchRegionsExtra[] = ['label' => 'Mobile to Address', 'href' => 'mobile_to_address.php'];
+}
+if (hasMobileAddressAdvAccess()) {
+    $searchRegionsExtra[] = ['label' => 'Mobile to Address Advanced', 'href' => 'mobile_address_advanced.php'];
 }
 $selectedState = $_GET['state'] ?? '';
 
