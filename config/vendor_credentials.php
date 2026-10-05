@@ -13,3 +13,9 @@ $PAN_INDIA_PRO_PASSWORD = 'Y9#R1@L6!X3';
 
 $TRACEKART_USERNAME = 'Lucky16';
 $TRACEKART_PASSWORD = 'Aug@2026#';
+
+// Nexora API key (includes/nexora_client.php) - powers Aadhaar to Family
+// Advanced, Mobile to Address (+ Advanced), and Indian/HP/Bharat Gas
+// Advanced. Blank until the real key is added - every one of those tools
+// throws "Nexora API key is not configured." until this is set.
+$NEXORA_API_KEY = '';

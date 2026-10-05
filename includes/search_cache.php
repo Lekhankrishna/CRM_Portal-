@@ -60,3 +60,21 @@ function searchCacheStore(PDO $pdo, string $table, string $searchKey, string $se
         // best-effort - see comment above
     }
 }
+
+// A cache hit still delivers a real result to the agent, so it must still
+// log/count exactly like a live search would - shared by every caller that
+// needs this (the Nexora-backed tools' own *_search.php endpoints), rather
+// than each one repeating the same INSERT inline.
+function searchLogSavedResult(PDO $pdo, string $type, string $query, int $count): void {
+    if (!isset($_SESSION['user_id'])) return;
+    try {
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
+        $pdo->prepare(
+            "INSERT INTO search_logs (user_id, search_type, search_query, result_count, ip_address)
+             VALUES (:uid, :type, :q, :cnt, :ip)"
+        )->execute([
+            'uid' => $_SESSION['user_id'], 'type' => $type, 'q' => mb_substr($query, 0, 512),
+            'cnt' => $count, 'ip' => substr($ip, 0, 45),
+        ]);
+    } catch (Throwable $e) {}
+}

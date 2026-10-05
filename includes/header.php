@@ -163,6 +163,12 @@ if (hasTataPlayAccess()) {
 if (hasAadhaarToRationAccess()) {
     $searchRegionsExtra[] = ['label' => 'Aadhaar to Family Members', 'href' => 'aadhaar_to_ration.php'];
 }
+// Aadhaar to Family Advanced (Nexora API) - an independently-sourced second
+// option for the same kind of lookup as Aadhaar to Family Members above,
+// placed directly below it. Own access flag + monthly quota.
+if (hasAadhaarFamilyApiAccess()) {
+    $searchRegionsExtra[] = ['label' => 'Aadhaar to Family Advanced', 'href' => 'aadhaar_family_api.php'];
+}
 $selectedState = $_GET['state'] ?? '';
 
 // Sidebar colour-coding (2026-08-03) - same 12-hue palette as the results

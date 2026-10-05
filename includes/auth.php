@@ -472,6 +472,27 @@ function requireAllGasAccess(string $loginPath = 'login.php'): void {
     }
 }
 
+// Same pattern as hasAllGasAccess() - checked fresh from the DB every
+// request. Defaults to NOT granted (see migrate_add_aadhaar_family_api.sql).
+function hasAadhaarFamilyApiAccess(): bool {
+    global $pdo;
+    if (!isLoggedIn()) return false;
+    static $access = null;
+    if ($access !== null) return $access;
+    $stmt = $pdo->prepare('SELECT aadhaar_family_api_access FROM users WHERE id = :id');
+    $stmt->execute(['id' => $_SESSION['user_id']]);
+    $access = (bool) $stmt->fetchColumn();
+    return $access;
+}
+
+function requireAadhaarFamilyApiAccess(string $loginPath = 'login.php'): void {
+    requireLogin($loginPath);
+    if (!hasAadhaarFamilyApiAccess()) {
+        http_response_code(403);
+        die('Access denied: Aadhaar to Family Advanced access has not been granted for this account.');
+    }
+}
+
 // Global settings row (id = 1) — created by migrate_add_whatsapp_button.sql.
 // Cached per-request; an admin's save on whatsapp_settings.php takes effect
 // on the very next request for every user, not just after their next login.
