@@ -894,7 +894,11 @@ require __DIR__ . '/../includes/header.php';
         <span>WhatsApp Button</span>
       </label>
       <?php endif; ?>
-      <?php if (subAdminCanGrant('all_gas_access')): ?>
+      <?php // All Gas hidden from the admin grid (per explicit instruction),
+      // same "false &&" pattern as LPG Search/Tracing 2.0 above - not
+      // deleted, still fully functional for any account that already has
+      // it. ?>
+      <?php if (false && subAdminCanGrant('all_gas_access')): ?>
       <label class="acf-feature">
         <input type="checkbox" name="all_gas_access" value="1">
         <span>All Gas</span>
@@ -1405,7 +1409,11 @@ require __DIR__ . '/../includes/header.php';
             <input type="checkbox" name="whatsapp_button_access" id="edit-whatsapp_button_access" value="1">
             <span>WhatsApp Button</span>
           </label>
-          <label class="acf-feature"<?= subAdminCanGrant('all_gas_access') ? '' : ' style="display:none"' ?>>
+          <!-- All Gas hidden from the admin grid (per explicit instruction),
+               same as LPG Search/Tracing 2.0 above - kept in the DOM (not
+               PHP-removed) since the JS below sets its value directly by id
+               with no null guard. -->
+          <label class="acf-feature" style="display:none">
             <input type="checkbox" name="all_gas_access" id="edit-all_gas_access" value="1">
             <span>All Gas</span>
             <span class="acf-limit" title="How many found Indane / Bharat Gas / HP Gas searches this agent can run per calendar month on All Gas (one limit per provider tab) - each spends real credits on the shared tracekart.in account. Ignored for admins.">
