@@ -304,3 +304,187 @@ function tracekartSearch(string $stateKey, string $mode, array $fields, bool $is
 
     return tracekartParseJsonRows($decoded['rows'] ?? [], $state['columns']);
 }
+
+// "All Gas" - tracekart.in's separate Skip Trace "Gas Connection" service
+// (same account as the state search above, different page entirely: HTML
+// result cards, not the JSON SearchData endpoint). One account per gas
+// provider (Indane/Bharat/HP), billed separately on the shared account, so
+// each gets its own monthly limit (see ALL_GAS_LIMIT_COLUMNS below).
+const TRACEKART_GAS_PAGE = '/SkipTrace/Service?key=gas-connection';
+const TRACEKART_GAS_SEARCH = '/SkipTrace/Search?key=gas-connection';
+
+const TRACEKART_GAS_PROVIDERS = [
+    'indane' => 'Indane',
+    'bharat' => 'Bharat Gas',
+    'hp'     => 'HP Gas',
+];
+
+function tracekartGasFetchPage(): ?string {
+    $ch = tracekartCurlHandle();
+    curl_setopt($ch, CURLOPT_URL, TRACEKART_BASE . TRACEKART_GAS_PAGE);
+    $html = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($html === false || ($httpCode >= 300 && $httpCode < 400)) return null;
+    return (string) $html;
+}
+
+// A hit renders #resultsContainer as a series of cards, each an <h3>
+// section title over a two-column table of <th>label</th><td>value</td>
+// rows - the first card just echoes the query (Mobile Number / Provider
+// Name), then e.g. "Hp Gas" (Message / Status Code / Success) and "Data"
+// (Consumer Number, refill flags, ...). Read as Section / Field / Value
+// rows (no field names hardcoded), plus one flat "record" of the same data
+// for the archive. Falls back to header-row tables and <dt>/<dd> lists in
+// case another provider renders differently.
+const TRACEKART_GAS_ECHO_FIELDS = ['Mobile Number', 'Provider Name'];
+
+function tracekartGasParse(string $html): array {
+    $message = preg_match('/var\s+msg\s*=\s*"((?:[^"\\\\]|\\\\.)*)"/', $html, $m) ? stripcslashes($m[1]) : '';
+
+    libxml_use_internal_errors(true);
+    $doc = new DOMDocument();
+    $doc->loadHTML('<?xml encoding="utf-8" ?>' . $html);
+    libxml_clear_errors();
+    $xpath = new DOMXPath($doc);
+    $container = $xpath->query("//div[@id='resultsContainer']")->item(0);
+
+    // Label/value card layout.
+    $fieldRows = [];
+    $record = [];
+    if ($container) {
+        foreach ($xpath->query('.//tr[th and td]', $container) as $tr) {
+            $label = trim(preg_replace('/\s+/', ' ', $xpath->query('./th', $tr)->item(0)->textContent));
+            $value = trim(preg_replace('/\s+/', ' ', $xpath->query('./td', $tr)->item(0)->textContent));
+            $h3 = $xpath->query('ancestor::div[contains(concat(" ", normalize-space(@class), " "), " card ")][1]//h3', $tr)->item(0);
+            $section = $h3 ? trim($h3->textContent) : '';
+            if ($section === '' && in_array($label, TRACEKART_GAS_ECHO_FIELDS, true)) continue;
+            if ($label === '') continue;
+            $fieldRows[] = ['Section' => $section, 'Field' => $label, 'Value' => $value];
+            $key = isset($record[$label]) && $section !== '' ? "$section: $label" : $label;
+            $record[$key] = $value;
+        }
+    }
+    if ($fieldRows) {
+        return ['totalResults' => count($fieldRows), 'headers' => ['Section', 'Field', 'Value'],
+                'rows' => $fieldRows, 'record' => $record, 'message' => ''];
+    }
+
+    $headers = [];
+    $rows = [];
+    if ($container) {
+        foreach ($xpath->query('.//table', $container) as $table) {
+            $th = [];
+            foreach ($xpath->query('.//thead//th | .//tr[1][not(ancestor::tbody)]/th', $table) as $h) $th[] = trim($h->textContent);
+            foreach ($xpath->query('.//tbody/tr | .//tr[td]', $table) as $tr) {
+                $cells = [];
+                $i = 0;
+                foreach ($xpath->query('./td', $tr) as $td) {
+                    $cells[$th[$i] ?? ('Column ' . ($i + 1))] = trim(preg_replace('/\s+/', ' ', $td->textContent));
+                    $i++;
+                }
+                if (array_filter($cells, fn($v) => $v !== '')) $rows[] = $cells;
+            }
+            foreach ($th as $h) if (!in_array($h, $headers, true)) $headers[] = $h;
+        }
+        // Rows can be matched twice by the two tr selectors above.
+        $rows = array_values(array_map('unserialize', array_unique(array_map('serialize', $rows))));
+
+        if (!$rows) {
+            $record = [];
+            $dts = $xpath->query('.//dt', $container);
+            foreach ($dts as $dt) {
+                $dd = $xpath->query('following-sibling::dd[1]', $dt)->item(0);
+                if ($dd) $record[trim($dt->textContent)] = trim(preg_replace('/\s+/', ' ', $dd->textContent));
+            }
+            if (!$record) {
+                $text = $container->textContent;
+                foreach (preg_split('/\R/', $text) as $line) {
+                    if (preg_match('/^\s*([^:]{2,60}):\s*(.+?)\s*$/u', $line, $kv)) $record[trim($kv[1])] = $kv[2];
+                }
+            }
+            if ($record) {
+                $rows[] = $record;
+                $headers = array_keys($record);
+            }
+        }
+    }
+    if (!$headers && $rows) $headers = array_keys($rows[0]);
+
+    return ['totalResults' => count($rows), 'headers' => $headers, 'rows' => $rows,
+            'record' => count($rows) === 1 ? $rows[0] : null, 'message' => $rows ? '' : $message];
+}
+
+function tracekartGasSearch(string $mobile, string $provider, bool $isRetry = false): array {
+    $mobile = preg_replace('/\D+/', '', $mobile);
+    if (strlen($mobile) !== 10) {
+        throw new RuntimeException('Enter a valid 10-digit mobile number.');
+    }
+    if (!isset(TRACEKART_GAS_PROVIDERS[$provider])) {
+        throw new RuntimeException('Select a gas provider.');
+    }
+
+    $page = tracekartGasFetchPage();
+    if ($page === null) {
+        if (!tracekartLogin()) {
+            throw new RuntimeException('Could not log into the All Gas service - check the tracekart.in credentials.');
+        }
+        $page = tracekartGasFetchPage();
+    }
+    $token = $page !== null ? tracekartExtractToken($page) : null;
+    if (!$token) {
+        throw new RuntimeException('Could not find a search token on the All Gas service.');
+    }
+
+    $ch = tracekartCurlHandle();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => TRACEKART_BASE . TRACEKART_GAS_SEARCH,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => http_build_query([
+            'mobile' => $mobile,
+            'provider_name' => $provider,
+            '__RequestVerificationToken' => $token,
+        ]),
+        CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
+        CURLOPT_TIMEOUT => 120,
+    ]);
+    $resp = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($resp === false) {
+        throw new RuntimeException('Could not reach the All Gas service.');
+    }
+    if ($httpCode >= 300 && $httpCode < 400) {
+        if ($isRetry || !tracekartLogin()) {
+            throw new RuntimeException('All Gas session expired and re-login failed.');
+        }
+        return tracekartGasSearch($mobile, $provider, true);
+    }
+    if ($httpCode !== 200) {
+        throw new RuntimeException('All Gas search failed (HTTP ' . $httpCode . ').');
+    }
+
+    return tracekartGasParse((string) $resp);
+}
+
+// All Gas per-provider monthly limits. Usage = this month's found searches
+// for that provider, read from search_logs (all_gas_api.php logs each
+// search as "<Provider label>: <mobile>").
+const ALL_GAS_LIMIT_COLUMNS = [
+    'indane' => 'all_gas_indane_monthly_limit',
+    'bharat' => 'all_gas_bharat_monthly_limit',
+    'hp'     => 'all_gas_hp_monthly_limit',
+];
+
+function allGasUsage(PDO $pdo, int $userId, string $provider): array {
+    $stmt = $pdo->prepare('SELECT ' . ALL_GAS_LIMIT_COLUMNS[$provider] . ' FROM users WHERE id = :id');
+    $stmt->execute(['id' => $userId]);
+    $limit = (int) $stmt->fetchColumn();
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(*) FROM search_logs WHERE user_id = :id AND search_type = 'all_gas'
+           AND search_query LIKE :prefix AND result_count > 0 AND searched_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+    );
+    $stmt->execute(['id' => $userId, 'prefix' => TRACEKART_GAS_PROVIDERS[$provider] . ': %']);
+    return ['used' => (int) $stmt->fetchColumn(), 'limit' => $limit];
+}

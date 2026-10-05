@@ -141,6 +141,13 @@ if (hasIndaneGasAccess()) {
 if (hasIndaneGasProAccess()) {
     $searchRegionsExtra[] = ['label' => 'Indane Gas Pro', 'href' => 'indane_gas_pro.php'];
 }
+// All Gas (tracekart.in Skip Trace "Gas Connection") - Indane/Bharat/HP gas
+// connection lookup by mobile number, same tracekart.in account as
+// Advanced Search. Own access flag + per-provider monthly quota, placed
+// directly below the other gas tools.
+if (hasAllGasAccess()) {
+    $searchRegionsExtra[] = ['label' => 'All Gas', 'href' => 'all_gas.php'];
+}
 // Tata Play is opt-in per account (Admin > Agents > "Tata Play Access") -
 // same pattern as HP LPG Search above (own tataplay.py Selenium automation
 // against the distributor's mysso.tataplay.com SSO login, proxied through

@@ -450,6 +450,28 @@ function requireAdvancedSearchAccess(string $loginPath = 'login.php'): void {
     }
 }
 
+// Same pattern as hasAdvancedSearchAccess() - checked fresh from the DB
+// every request so a revoke from Admin > Agents takes effect immediately.
+// Defaults to NOT granted (see migrate_add_all_gas.sql).
+function hasAllGasAccess(): bool {
+    global $pdo;
+    if (!isLoggedIn()) return false;
+    static $access = null;
+    if ($access !== null) return $access;
+    $stmt = $pdo->prepare('SELECT all_gas_access FROM users WHERE id = :id');
+    $stmt->execute(['id' => $_SESSION['user_id']]);
+    $access = (bool) $stmt->fetchColumn();
+    return $access;
+}
+
+function requireAllGasAccess(string $loginPath = 'login.php'): void {
+    requireLogin($loginPath);
+    if (!hasAllGasAccess()) {
+        http_response_code(403);
+        die('Access denied: All Gas access has not been granted for this account.');
+    }
+}
+
 // Global settings row (id = 1) — created by migrate_add_whatsapp_button.sql.
 // Cached per-request; an admin's save on whatsapp_settings.php takes effect
 // on the very next request for every user, not just after their next login.
