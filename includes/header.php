@@ -294,6 +294,8 @@ $expiresLabel = $expiresAt ? date('d-F-Y', strtotime($expiresAt)) : null;
           <span class="sidebar__avatar" style="background:rgb(<?= $avatarColor ?>)"><?= strtoupper(substr($region['label'], 0, 1)) ?></span>
           <?php if ($region['label'] === 'Advanced Search'): ?>
             <span style="font-weight:700"><?= htmlspecialchars($region['label']) ?></span>
+          <?php elseif (in_array($region['label'], $pinnedBlueLabels, true)): ?>
+            <span style="color:rgb(37,99,235);font-weight:700"><?= htmlspecialchars($region['label']) ?></span>
           <?php else: ?>
             <?= htmlspecialchars($region['label']) ?>
           <?php endif; ?>
