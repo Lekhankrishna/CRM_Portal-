@@ -968,7 +968,7 @@ require __DIR__ . '/../includes/header.php';
           </span>
         </label>
         <?php endif; ?>
-        <?php if (false && subAdminCanGrant('hp_gas_api_access')): ?>
+        <?php if (subAdminCanGrant('hp_gas_api_access')): ?>
         <label class="acf-feature">
           <input type="checkbox" name="hp_gas_api_access" value="1">
           <span>HP Gas Advanced</span>
@@ -977,7 +977,7 @@ require __DIR__ . '/../includes/header.php';
           </span>
         </label>
         <?php endif; ?>
-        <?php if (false && subAdminCanGrant('bharat_gas_api_access')): ?>
+        <?php if (subAdminCanGrant('bharat_gas_api_access')): ?>
         <label class="acf-feature">
           <input type="checkbox" name="bharat_gas_api_access" value="1">
           <span>Bharat Gas Advanced</span>
@@ -1468,14 +1468,14 @@ require __DIR__ . '/../includes/header.php';
                 <input type="number" name="hp_gas_monthly_limit" id="edit-hp_gas_monthly_limit" value="5" min="0" max="65535" onclick="event.stopPropagation()">/mo
               </span>
             </label>
-            <label class="acf-feature" style="display:none">
+            <label class="acf-feature"<?= subAdminCanGrant('hp_gas_api_access') ? '' : ' style="display:none"' ?>>
               <input type="checkbox" name="hp_gas_api_access" id="edit-hp_gas_api_access" value="1">
               <span>HP Gas Advanced</span>
               <span class="acf-limit" title="How many searches this agent can run per calendar month on HP Gas Advanced - every search counts, found or not, since each spends real credits on the shared Nexora API account. Ignored for admins.">
                 <input type="number" name="hp_gas_api_monthly_limit" id="edit-hp_gas_api_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()">/mo
               </span>
             </label>
-            <label class="acf-feature" style="display:none">
+            <label class="acf-feature"<?= subAdminCanGrant('bharat_gas_api_access') ? '' : ' style="display:none"' ?>>
               <input type="checkbox" name="bharat_gas_api_access" id="edit-bharat_gas_api_access" value="1">
               <span>Bharat Gas Advanced</span>
               <span class="acf-limit" title="How many searches this agent can run per calendar month on Bharat Gas Advanced - every search counts, found or not, since each spends real credits on the shared Nexora API account. Ignored for admins.">
