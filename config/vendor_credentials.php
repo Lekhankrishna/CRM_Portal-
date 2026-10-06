@@ -16,6 +16,6 @@ $TRACEKART_PASSWORD = 'Aug@2026#';
 
 // Nexora API key (includes/nexora_client.php) - powers Aadhaar to Family
 // Advanced, Mobile to Address (+ Advanced), and Indian/HP/Bharat Gas
-// Advanced. Blank until the real key is added - every one of those tools
-// throws "Nexora API key is not configured." until this is set.
-$NEXORA_API_KEY = '';
+// Advanced. From the Partner Dashboard's "API Credentials" tab
+// (nexoraapi.in/dashboard, Partner ID PART-1789817715056).
+$NEXORA_API_KEY = '59fea8c44f98116c48ed642ebb13bba439f5e0171270090af4d31be68e4e7bc9';
