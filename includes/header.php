@@ -136,7 +136,7 @@ if (hasRcPrintAccess()) {
 // not dependent on generic tracing2_access - an agent with only HP Gas
 // granted had no sidebar way to reach it while Tracing 2.0 itself was
 // hidden from them.
-if (hasHpGasAccess()) {
+if (false && hasHpGasAccess()) {
     $searchRegionsExtra[] = ['label' => 'HP Gas', 'href' => 'hp_gas.php'];
 }
 // Dedicated single-purpose page for the "Indane Gas Info" tool
@@ -146,7 +146,7 @@ if (hasHpGasAccess()) {
 // generic Tracing 2.0 per-tool checklist 2026-08-18 - see
 // includes/tracing2_tools.php's own comment on why), same pattern as RC
 // Print/HP LPG Search.
-if (hasIndaneGasAccess()) {
+if (false && hasIndaneGasAccess()) {
     $searchRegionsExtra[] = ['label' => 'Indane Gas', 'href' => 'indane_gas_info.php'];
 }
 // Indane Gas Pro (app.cyfuture.co.in "LPG Emergency Helpline") - a separate
