@@ -898,7 +898,10 @@ require __DIR__ . '/../includes/header.php';
       <label class="acf-feature">
         <input type="checkbox" name="all_gas_access" value="1">
         <span>All Gas</span>
-        <span class="acf-limit" title="How many found Indane / Bharat Gas / HP Gas searches this agent can run per calendar month on All Gas (one limit per provider tab) - each spends real credits on the shared tracekart.in account. Ignored for admins.">
+        <!-- Per-provider limit inputs hidden (per explicit instruction) -
+             still present and still submitted (default 50 each), just not
+             shown to the admin configuring this checkbox anymore. -->
+        <span class="acf-limit" style="display:none" title="How many found Indane / Bharat Gas / HP Gas searches this agent can run per calendar month on All Gas (one limit per provider tab) - each spends real credits on the shared tracekart.in account. Ignored for admins.">
           <input type="number" name="all_gas_indane_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()" style="width:34px" title="Indane/mo">I
           <input type="number" name="all_gas_bharat_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()" style="width:34px" title="Bharat Gas/mo">B
           <input type="number" name="all_gas_hp_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()" style="width:34px" title="HP Gas/mo">H
@@ -1408,7 +1411,10 @@ require __DIR__ . '/../includes/header.php';
           <label class="acf-feature"<?= subAdminCanGrant('all_gas_access') ? '' : ' style="display:none"' ?>>
             <input type="checkbox" name="all_gas_access" id="edit-all_gas_access" value="1">
             <span>All Gas</span>
-            <span class="acf-limit" title="How many found Indane / Bharat Gas / HP Gas searches this agent can run per calendar month on All Gas (one limit per provider tab) - each spends real credits on the shared tracekart.in account. Ignored for admins.">
+            <!-- Per-provider limit inputs hidden (per explicit instruction) -
+                 still present/kept in sync by the JS below (an existing
+                 agent's real values), just not shown to the admin anymore. -->
+            <span class="acf-limit" style="display:none" title="How many found Indane / Bharat Gas / HP Gas searches this agent can run per calendar month on All Gas (one limit per provider tab) - each spends real credits on the shared tracekart.in account. Ignored for admins.">
               <input type="number" name="all_gas_indane_monthly_limit" id="edit-all_gas_indane_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()" style="width:34px" title="Indane/mo">I
               <input type="number" name="all_gas_bharat_monthly_limit" id="edit-all_gas_bharat_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()" style="width:34px" title="Bharat Gas/mo">B
               <input type="number" name="all_gas_hp_monthly_limit" id="edit-all_gas_hp_monthly_limit" value="50" min="0" max="65535" onclick="event.stopPropagation()" style="width:34px" title="HP Gas/mo">H
