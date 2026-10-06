@@ -15,7 +15,7 @@ LOCATEME_PASSWORD = "Ashwanth@gmail.com"
 # Real Tata Play distributor SSO login (mysso.tataplay.com) for tataplay.py's
 # Selenium automation - same reasoning as the SDMS/LOCATEME credentials above.
 TATAPLAY_USERNAME = "Dis_20287"
-TATAPLAY_PASSWORD = "Jaya@11566"
+TATAPLAY_PASSWORD = "Swamy@156"
 
 # Real app.cyfuture.co.in login ("LPG Emergency Helpline" - BPCL/HPCL/IOCL
 # complaint portal) for indane_gas_pro.py's Selenium automation - same
