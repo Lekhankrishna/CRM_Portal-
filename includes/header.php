@@ -276,17 +276,11 @@ $expiresLabel = $expiresAt ? date('d-F-Y', strtotime($expiresAt)) : null;
         // rather than the auto-cycled palette every other item uses -
         // $navColorIndex still increments normally so it doesn't shift any
         // other item's color. Mobile to Address (+ Advanced) and the gas
-        // tools below are pinned to the same indigo Mobile to Address
-        // already happened to land on via the auto-cycle, per explicit
-        // instruction to make them match.
-        $pinnedIndigoLabels = ['Mobile to Address', 'Mobile to Address Advanced', 'All Gas Advanced', 'All Gas', 'Indane Gas Pro'];
-        if ($region['label'] === 'Advanced Search') {
-            $avatarColor = '31,41,55';
-        } elseif (in_array($region['label'], $pinnedIndigoLabels, true)) {
-            $avatarColor = '124,58,237';
-        } else {
-            $avatarColor = sidebarNavColor($thisColorIndex);
-        }
+        // tools below are pinned to that same dark per a follow-up explicit
+        // instruction ("like this advanced search dark need") - briefly
+        // pinned to indigo instead (124,58,237) before this correction.
+        $pinnedDarkLabels = ['Advanced Search', 'Mobile to Address', 'Mobile to Address Advanced', 'All Gas Advanced', 'All Gas', 'Indane Gas Pro'];
+        $avatarColor = in_array($region['label'], $pinnedDarkLabels, true) ? '31,41,55' : sidebarNavColor($thisColorIndex);
       ?>
         <a href="<?= preg_match('#^https?://#', $region['href']) ? $region['href'] : $bp . $region['href'] ?>"
            class="sidebar__item<?= $isActive ? ' active' : '' ?>"
