@@ -175,13 +175,13 @@ if (hasIndaneGasAccess() || hasIndianGasApiAccess() || hasHpGasAccess() || hasHp
 // options alongside the existing locateme.services-backed Indane Gas/HP LPG
 // Search (Bharat Gas has no existing equivalent), also reachable as tabs on
 // All Gas Advanced above. Own access flag + monthly quota each.
-if (hasIndianGasApiAccess()) {
+if (false && hasIndianGasApiAccess()) {
     $searchRegionsExtra[] = ['label' => 'Indian Gas Advanced', 'href' => 'indian_gas_api.php'];
 }
-if (hasHpGasApiAccess()) {
+if (false && hasHpGasApiAccess()) {
     $searchRegionsExtra[] = ['label' => 'HP Gas Advanced', 'href' => 'hp_gas_advanced.php'];
 }
-if (hasBharatGasApiAccess()) {
+if (false && hasBharatGasApiAccess()) {
     $searchRegionsExtra[] = ['label' => 'Bharat Gas Advanced', 'href' => 'bharat_gas_advanced.php'];
 }
 // Tata Play is opt-in per account (Admin > Agents > "Tata Play Access") -
